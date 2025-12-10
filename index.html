@@ -435,11 +435,39 @@
 
             const getStatusBannerColor = (status) => {
                  const s = status || '';
-                 if (s === '完了' || s === '請求済') return 'bg-slate-600';
-                 if (s.includes('中') || s.includes('作成')) return 'bg-brand-600';
-                 if (s.includes('待ち') || s.includes('準備')) return 'bg-amber-500';
-                 if (s.includes('作業保留中')) return 'bg-red-500';
-                 return 'bg-brand-600';
+                 switch (s) {
+                    case "作業開始前": return 'bg-sky-300';
+                    
+                    case "資料受領待ち":
+                    case "社内レビュー待ち":
+                    case "ムラシスレビュー待ち":
+                    case "システム検証待ち":
+                    case "第三者検証待ち":
+                    case "VAO/MCS試験待ち":
+                        return 'bg-amber-400';
+                    
+                    case "成果物作成中": return 'bg-lime-400';
+                    
+                    case "統合試験準備中": return 'bg-emerald-300';
+                    case "統合試験中": return 'bg-emerald-600';
+                    
+                    case "社内検証準備中": return 'bg-rose-300';
+                    case "社内検証中": return 'bg-rose-500';
+                    
+                    case "システム検証中":
+                    case "VAO/MCS試験中":
+                        return 'bg-purple-400';
+                    
+                    case "第三者検証中": return 'bg-purple-700';
+                    
+                    case "完了":
+                    case "請求済":
+                        return 'bg-blue-800';
+                    
+                    case "作業保留中": return 'bg-red-500';
+                    
+                    default: return 'bg-brand-600';
+                 }
             };
 
             const filteredProjects = projects.filter(p => {
@@ -617,24 +645,24 @@
                                                             return (
                                                                 <React.Fragment key={task.key}>
                                                                     <div className={`flex-shrink-0 w-36 bg-white border border-slate-200 rounded p-2 text-[10px] shadow-sm flex flex-col justify-between h-full ${isGrayedOut ? 'bg-gray-100 text-gray-400' : ''}`}>
-                                                                        <div className="flex justify-between items-center mb-1 border-b border-slate-100 pb-1">
-                                                                            <span className={`font-bold truncate ${isGrayedOut ? 'text-gray-500' : 'text-slate-700'}`} title={task.shortName || task.name}>{task.shortName || task.name}</span>
-                                                                        </div>
-                                                                        <div className="text-center py-1">
-                                                                             <span className={`font-bold text-xs ${
-                                                                                 isCompleted ? (hasActual ? 'text-green-800/50' : 'text-green-600') : 
-                                                                                 isExcluded ? 'text-gray-400' : 
-                                                                                 (hasActual ? 'text-gray-400' : 'text-slate-600')
-                                                                             }`}>{status}</span>
-                                                                        </div>
-                                                                        <div className={`space-y-0.5 ${isGrayedOut ? 'text-gray-400' : 'text-slate-500'}`}>
-                                                                            <div className="flex justify-between"><span>予定日:</span> <span>{formatDateShort(p[kPlan])}</span></div>
-                                                                            <div className="flex justify-between"><span>完了日:</span> <span>{formatDateShort(p[kActual])}</span></div>
-                                                                            <div className={`flex justify-between border-t pt-0.5 mt-0.5 ${isGrayedOut ? 'border-gray-200' : 'border-slate-50'}`}>
-                                                                                <UserIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                                                                                <span className="text-right break-words flex-1 ml-1" title={p[kAssignee]}>{p[kAssignee] || '-'}</span>
+                                                                            <div className="flex justify-between items-center mb-1 border-b border-slate-100 pb-1">
+                                                                                <span className={`font-bold truncate ${isGrayedOut ? 'text-gray-500' : 'text-slate-700'}`} title={task.shortName || task.name}>{task.shortName || task.name}</span>
                                                                             </div>
-                                                                        </div>
+                                                                            <div className="text-center py-1">
+                                                                                 <span className={`font-bold text-xs ${
+                                                                                     isCompleted ? (hasActual ? 'text-green-800/50' : 'text-green-600') : 
+                                                                                     isExcluded ? 'text-gray-400' : 
+                                                                                     (hasActual ? 'text-gray-400' : 'text-slate-600')
+                                                                                 }`}>{status}</span>
+                                                                            </div>
+                                                                            <div className={`space-y-0.5 ${isGrayedOut ? 'text-gray-400' : 'text-slate-500'}`}>
+                                                                                <div className="flex justify-between"><span>予定日:</span> <span>{formatDateShort(p[kPlan])}</span></div>
+                                                                                <div className="flex justify-between"><span>完了日:</span> <span>{formatDateShort(p[kActual])}</span></div>
+                                                                                <div className={`flex justify-between border-t pt-0.5 mt-0.5 ${isGrayedOut ? 'border-gray-200' : 'border-slate-50'}`}>
+                                                                                    <UserIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                                                                    <span className="text-right break-words flex-1 ml-1" title={p[kAssignee]}>{p[kAssignee] || '-'}</span>
+                                                                                </div>
+                                                                            </div>
                                                                     </div>
                                                                     {index < TARGET_TASKS.length - 1 && (
                                                                         <div className="text-slate-300 font-bold text-lg flex-shrink-0">&gt;</div>

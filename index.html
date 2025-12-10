@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ムラシスクリーン作業一覧2026</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
+                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .animate-spin-slow { animation: spin 2s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        /* Error Overlay */
+        #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; padding: 20px; color: red; overflow: auto; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <div id="error-overlay"></div>
+
+    <script>
+        // Global Error Handler
+        window.onerror = function(message, source, lineno, colno, error) {
+            const overlay = document.getElementById('error-overlay');
+            overlay.style.display = 'block';
+            overlay.innerHTML += `<h3>Error Occurred</h3><p>${message}</p><p>${source}:${lineno}:${colno}</p><pre>${error && error.stack}</pre>`;
+        };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- Mock Data & API Wrapper for Preview ---
+        const isPreview = typeof google === 'undefined' || typeof google.script === 'undefined';
+        
+        let mockProjects = [];
+
+        // API Wrapper
+        const backend = {
+            getData: (onSuccess, onFailure) => {
+                if (isPreview) {
+                    setTimeout(() => onSuccess({ projects: mockProjects }), 500);
+                } else {
+                    google.script.run
+                        .withSuccessHandler(onSuccess)
+                        .withFailureHandler(onFailure)
+                        .apiGetData();
+                }
+            },
+            syncWbsProgress: (onSuccess, onFailure) => {
+                if (isPreview) {
+                    // Mock data for preview
+                    mockProjects = mockProjects.map(p => ({ 
+                        ...p, 
+                        wbsProgress: Math.random(), 
+                        manDays: (Math.random() * 50).toFixed(1),
+                        manMonths: (Math.random() * 2.5).toFixed(2),
+                        task_revInternal_plan: '2025/05/01', task_revInternal_status: '完了', task_revInternal_assignee: '佐藤',
+                        task_revMurasys_plan: '2025/05/10', task_revMurasys_status: '予定',
+                    })); 
+                    setTimeout(() => onSuccess({ projects: [...mockProjects] }), 1000);
+                } else {
+                    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiSyncWbsProgress();
+                }
+            },
+            createProject: (project, onSuccess, onFailure) => {
+                if (isPreview) {
+                    if(!project.id) project.id = Math.random().toString(36).substr(2, 9);
+                    project.wbsUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_example/pubhtml"; 
+                    mockProjects.push(project);
+                    setTimeout(() => onSuccess({ projects: [...mockProjects] }), 1500);
+                } else {
+                    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiCreateProject(project);
+                }
+            },
+            updateProject: (project, onSuccess, onFailure) => {
+                if (isPreview) {
+                    const idx = mockProjects.findIndex(p => p.id === project.id);
+                    if(idx >= 0) mockProjects[idx] = project;
+                    setTimeout(() => onSuccess({ projects: [...mockProjects] }), 500);
+                } else {
+                    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiUpdateProject(project);
+                }
+            }
+        };
+
+        // --- Icons ---
+        const IconBase = ({ children, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>);
+        const PlusIcon = ({ className }) => (<IconBase className={className}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></IconBase>);
+        const BriefcaseIcon = ({ className }) => (<IconBase className={className}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></IconBase>);
+        const ArchiveIcon = ({ className }) => (<IconBase className={className}><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></IconBase>);
+        const ChevronDownIcon = ({ className }) => (<IconBase className={className}><polyline points="6 9 12 15 18 9"></polyline></IconBase>);
+        const ChevronUpIcon = ({ className }) => (<IconBase className={className}><polyline points="18 15 12 9 6 15"></polyline></IconBase>);
+        const MapPinIcon = ({ className }) => (<IconBase className={className}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></IconBase>);
+        const FileTextIcon = ({ className }) => (<IconBase className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></IconBase>);
+        const ExternalLinkIcon = ({ className }) => (<IconBase className={className}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></IconBase>);
+        const RefreshIcon = ({ className }) => (<IconBase className={className}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21h5v-5"></path></IconBase>);
+        const CheckCircleIcon = ({ className }) => (<IconBase className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></IconBase>);
+        const ClockIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></IconBase>);
+        const XIcon = ({ className }) => (<IconBase className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></IconBase>);
+        const UserIcon = ({ className }) => (<IconBase className={className}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></IconBase>);
+        const SettingsIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></IconBase>);
+
+        // --- Constants ---
+        const PROJECT_STATUS_OPTIONS = [
+            "資料受領待ち", "成果物作成中", "社内レビュー待ち", "ムラシスレビュー待ち",
+            "統合試験準備中", "統合試験中", "社内検証準備中", "社内検証中",
+            "システム検証待ち", "システム検証中", "第三者検証待ち", "第三者検証中",
+            "完了", "作業保留中", "VAO/MCS試験待ち", "VAO/MCS試験中", "出張中", "請求済"
+        ];
+
+        const TARGET_TASKS = [
+          { key: 'revInternal', name: '定義レビュー(社内)', shortName: '社内レビュー' },
+          { key: 'revMurasys',  name: '定義レビュー(ムラシス)', shortName: 'ムラシスレビュー' },
+          { key: 'testInteg',   name: '統合試験', shortName: '統合試験' },
+          { key: 'testActs',    name: 'ACTS社内検証', shortName: 'ACTS検証' },
+          { key: 'testSystem',  name: 'システム検証', shortName: 'システム検証' },
+          { key: 'test3rd',     name: '第三者検証', shortName: '第三者検証' }
+        ];
+
+        // --- Main App Component ---
+        function App() {
+            const [projects, setProjects] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [expandedProjectIds, setExpandedProjectIds] = useState(new Set());
+            const [tab, setTab] = useState('active');
+            const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+            const [projectForm, setProjectForm] = useState({ 
+                name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '' 
+            });
+            const [syncing, setSyncing] = useState(false);
+            const [activeWbsUrl, setActiveWbsUrl] = useState(null);
+            
+            // Project Settings Modal State
+            const [editingProject, setEditingProject] = useState(null);
+
+            const isSaving = useRef(false);
+
+            // Fetch Data
+            const fetchData = useCallback(() => {
+                if (isSaving.current) return;
+                backend.getData(
+                    (data) => {
+                        if (isSaving.current) return;
+                        setProjects(prev => JSON.stringify(prev) !== JSON.stringify(data.projects) ? (data.projects || []) : prev);
+                        setLoading(false);
+                    },
+                    (err) => console.error("Fetch error:", err)
+                );
+            }, []);
+
+            // Sync WBS
+            const handleSyncWbs = useCallback(() => {
+                if(syncing) return;
+                setSyncing(true);
+                backend.syncWbsProgress(
+                    (data) => {
+                        setProjects(data.projects || []);
+                        setSyncing(false);
+                    },
+                    (err) => {
+                        console.error("Sync error:", err);
+                        setSyncing(false);
+                    }
+                );
+            }, [syncing]);
+
+            useEffect(() => {
+                fetchData();
+                const interval = setInterval(fetchData, 8000); 
+                const initialSyncTimer = setTimeout(() => {
+                    if (!isSaving.current) {
+                        console.log("Auto-syncing WBS progress...");
+                        handleSyncWbs();
+                    }
+                }, 2000); 
+                return () => {
+                    clearInterval(interval);
+                    clearTimeout(initialSyncTimer);
+                };
+            }, []); 
+
+            const handleUpdateData = (newData) => {
+                setProjects(newData.projects || []);
+            };
+
+            const toggleExpand = (id) => {
+                setExpandedProjectIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                });
+            };
+
+            const handleSelectProject = (project) => {
+                if (project.wbsUrl) {
+                    let url = project.wbsUrl;
+                    if (url.includes('/preview')) {
+                        url = url.replace(/\/preview.*$/, '/edit');
+                    }
+                    setActiveWbsUrl(url);
+                } else {
+                    setActiveWbsUrl(null);
+                }
+            };
+
+            const handleCreateProject = (e) => {
+                e.preventDefault();
+                setLoading(true);
+                isSaving.current = true;
+                
+                const cleanData = {
+                    name: (projectForm.name || '').toString(),
+                    siteName: (projectForm.siteName || '').toString(),
+                    code: (projectForm.code || '').toString(),
+                    pwbs: (projectForm.pwbs || '').toString(),
+                    sakuban: (projectForm.sakuban || '').toString(),
+                    estimateNo: (projectForm.estimateNo || '').toString(),
+                    deadline: (projectForm.deadline || '').toString(),
+                    description: (projectForm.description || '').toString(),
+                    status: 'active',
+                    projectStatus: "資料受領待ち"
+                };
+
+                backend.createProject(
+                    cleanData,
+                    (data) => { 
+                        isSaving.current = false;
+                        handleUpdateData(data); 
+                        setLoading(false); 
+                        setIsProjectModalOpen(false); 
+                        setProjectForm({ name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '' }); 
+                        alert("プロジェクトを作成しました。");
+                    },
+                    (err) => { 
+                        isSaving.current = false;
+                        alert("作成エラー: " + err); 
+                        setLoading(false); 
+                    }
+                );
+            };
+
+            const handleUpdateProject = (id, data) => {
+                const p = projects.find(p => p.id === id);
+                if (!p) return;
+                const updated = { ...p, ...data };
+                setProjects(projects.map(prj => prj.id === id ? updated : prj));
+                isSaving.current = true;
+                backend.updateProject(updated, 
+                    (resData) => {
+                        isSaving.current = false;
+                        handleUpdateData(resData);
+                    }, 
+                    (err) => {
+                        isSaving.current = false;
+                        console.error(err);
+                    }
+                );
+            };
+            
+            // Handler for settings modal save
+            const handleSaveSettings = (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const updates = {
+                   name: fd.get('name'), 
+                   code: fd.get('code'),
+                   pwbs: fd.get('pwbs'),
+                   sakuban: fd.get('sakuban'),
+                   estimateNo: fd.get('estimateNo'),
+                   deadline: fd.get('deadline'),
+                   siteName: fd.get('siteName'),
+                   wbsUrl: fd.get('wbsUrl')
+                };
+                handleUpdateProject(editingProject.id, updates);
+                setEditingProject(null);
+            };
+
+            const handleArchiveProject = (id) => {
+                if(confirm("完了（アーカイブ）しますか？")) handleUpdateProject(id, { status: 'completed' });
+            };
+
+            const handleRestoreProject = (id) => {
+                if(confirm("アクティブに戻しますか？")) handleUpdateProject(id, { status: 'active' });
+            };
+
+            const handleSmartPaste = (e) => {
+                const text = e.target.value;
+                if (!text) return;
+                const lines = text.trim().split('\n');
+                if (lines.length === 0) return;
+                const cols = lines[0].split('\t');
+                
+                if (cols.length < 5) {
+                    alert("列数が不足しています。Excelから行全体をコピーしてください。");
+                    return;
+                }
+
+                const estimateNo = cols[0] || '';
+                const content = cols[1] || ''; 
+                const siteNameRaw = cols[2] || '';
+                const siteCode = cols[3] || '';
+                
+                const siteNameParts = [siteNameRaw];
+                if (siteCode && !siteCode.includes('担当') && !siteCode.includes('CSPA4') && siteCode.trim() !== '') {
+                    siteNameParts.push(siteCode);
+                }
+                const siteName = siteNameParts.join(' ').trim();
+                const name = content.trim();
+
+                let pwbs = '';
+                let sakuban = '';
+                let pjCode = '';
+                let deadlineRaw = '';
+
+                let lastIdx = cols.length - 1;
+                while (lastIdx > 4 && !cols[lastIdx].trim()) {
+                    lastIdx--;
+                }
+
+                if (cols[lastIdx] && (cols[lastIdx].includes('/') || cols[lastIdx].includes('-'))) {
+                    deadlineRaw = cols[lastIdx];
+                    pjCode = cols[lastIdx - 1] || '';
+                    let val1 = cols[lastIdx - 2] || '';
+                    let val2 = cols[lastIdx - 3] || '';
+                    
+                    if (/^\d{5}$/.test(val1) && /^[A-Z]\d{3}$/.test(val2)) {
+                        sakuban = val1;
+                        pwbs = val2;
+                    } else {
+                        pwbs = val1;
+                    }
+                } else {
+                    pjCode = cols[lastIdx] || '';
+                    let val1 = cols[lastIdx - 1] || '';
+                    let val2 = cols[lastIdx - 2] || '';
+                    
+                    if (/^\d{5}$/.test(val1) && /^[A-Z]\d{3}$/.test(val2)) {
+                        sakuban = val1;
+                        pwbs = val2;
+                    } else {
+                        pwbs = val1;
+                    }
+                }
+
+                if (!sakuban && pwbs) {
+                    if (pwbs.match(/^[A-Z]\d{3}\d{5}$/)) {
+                        sakuban = pwbs.slice(4);
+                        pwbs = pwbs.slice(0, 4);
+                    } else if (pwbs.match(/^[A-Z]\d{3}-\d{5}$/)) {
+                        const parts = pwbs.split('-');
+                        pwbs = parts[0];
+                        sakuban = parts[1];
+                    }
+                }
+
+                let deadline = '';
+                if (deadlineRaw) {
+                    const dateMatch = deadlineRaw.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                    if (dateMatch) {
+                        deadline = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+                    }
+                }
+
+                setProjectForm({ 
+                    ...projectForm, 
+                    name, 
+                    siteName, 
+                    code: pjCode, 
+                    pwbs,
+                    sakuban,
+                    estimateNo, 
+                    deadline, 
+                    description: '' 
+                });
+            };
+
+            const getStatusBannerColor = (status) => {
+                 const s = status || '';
+                 if (s === '完了' || s === '請求済') return 'bg-slate-600';
+                 if (s.includes('中') || s.includes('作成')) return 'bg-brand-600';
+                 if (s.includes('待ち') || s.includes('準備')) return 'bg-amber-500';
+                 if (s.includes('保留')) return 'bg-red-500';
+                 return 'bg-brand-600';
+            };
+
+            const filteredProjects = projects.filter(p => {
+                if (tab === 'active') return p.status !== 'completed';
+                return p.status === 'completed';
+            });
+
+            const formatProgress = (val) => {
+                if (val === undefined || val === '' || val === null) return '0%';
+                if (typeof val === 'number') return Math.round(val * 100) + '%';
+                if (typeof val === 'string') {
+                    if (val.includes('%')) return val;
+                    const num = parseFloat(val);
+                    if (!isNaN(num)) {
+                        if (num <= 1 && num > 0) return Math.round(num * 100) + '%';
+                        return Math.round(num) + '%';
+                    }
+                }
+                return val;
+            };
+
+            const formatCost = (val, decimals) => {
+                if (val === undefined || val === '' || val === null) return '-';
+                const num = parseFloat(val);
+                if (isNaN(num)) return val;
+                return num.toFixed(decimals);
+            };
+            
+            const formatDateShort = (dateStr) => {
+                if (!dateStr) return '-';
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return dateStr;
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+            };
+
+            const autoResizeTextarea = (e) => {
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+            };
+
+            const setInitialTextareaHeight = (el) => {
+                if (el) {
+                    el.style.height = 'auto';
+                    el.style.height = el.scrollHeight + 'px';
+                }
+            };
+
+            const renderProjectList = (isCompact) => {
+                if (loading) return <div className="text-center py-10 text-sm w-full">Loading...</div>;
+                if (filteredProjects.length === 0) return (
+                    <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl bg-white w-full">
+                        <p className="text-sm text-slate-400">プロジェクトなし</p>
+                    </div>
+                );
+
+                // Normal Mode (List Layout)
+                if (!isCompact) {
+                    return (
+                        <div className="space-y-4">
+                            {filteredProjects.map(p => {
+                                const isExpanded = expandedProjectIds.has(p.id);
+                                return (
+                                    <div key={p.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+                                        {/* Header */}
+                                        <div className="relative cursor-pointer" onClick={(e) => {
+                                            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea')) return;
+                                            toggleExpand(p.id);
+                                        }}>
+                                            <div className={`h-2 w-full transition-colors duration-500 ${getStatusBannerColor(p.projectStatus)}`}></div>
+                                            <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                
+                                                {/* Left: Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        {p.siteName && (
+                                                            <div className="flex items-center text-sm font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded truncate max-w-[200px]">
+                                                                <MapPinIcon className="w-3 h-3 mr-1" />
+                                                                {p.siteName}
+                                                            </div>
+                                                        )}
+                                                        <span className={`inline-block text-sm px-2 py-0.5 rounded text-white font-medium whitespace-nowrap ${getStatusBannerColor(p.projectStatus)}`}>{p.projectStatus || '未設定'}</span>
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-slate-900 leading-tight truncate mb-1" title={p.name}>{p.name}</h3>
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 font-mono">
+                                                        {/* PJ Code Removed per request */}
+                                                        {p.pwbs && <span className="flex items-center"><span className="text-slate-400 mr-1">作番:</span>{p.pwbs}{p.sakuban ? `-${p.sakuban}` : ''}</span>}
+                                                        {p.estimateNo && <span className="flex items-center"><span className="text-slate-400 mr-1">見積:</span>{p.estimateNo}</span>}
+                                                    </div>
+                                                </div>
+
+                                                {/* Right: Cost, Progress, WBS Button, Expand */}
+                                                <div className="flex items-center gap-6 flex-shrink-0 self-end md:self-center">
+                                                    
+                                                    {/* Cost Info */}
+                                                    <div className="text-right flex flex-col items-end text-sm font-mono text-slate-500">
+                                                        <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manDays, 1)}</span>人日</div>
+                                                        <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manMonths, 2)}</span>人月</div>
+                                                    </div>
+
+                                                    {/* Progress */}
+                                                    <div className="text-right flex flex-col items-end">
+                                                        <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1">
+                                                            Progress
+                                                            <button onClick={(e) => { e.stopPropagation(); handleSyncWbs(); }} className="text-slate-400 hover:text-brand-600 transition-colors">
+                                                                <RefreshIcon className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
+                                                            </button>
+                                                        </div>
+                                                        <div className="text-4xl font-bold text-slate-700 leading-none">{formatProgress(p.wbsProgress)}</div>
+                                                    </div>
+
+                                                    {/* Big WBS Button for WBS Mode */}
+                                                    <button 
+                                                        className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl border transition-all shadow-sm ${p.wbsUrl ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 hover:scale-105 cursor-pointer shadow-md' : 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (p.wbsUrl) handleSelectProject(p);
+                                                        }}
+                                                        title={p.wbsUrl ? "WBSを開く（画面分割）" : "WBSリンクなし"}
+                                                    >
+                                                        <FileTextIcon className="w-8 h-8 mb-1" />
+                                                        <span className="text-sm font-bold">WBS</span>
+                                                    </button>
+
+                                                    {/* Expand Arrow */}
+                                                    <button className="text-slate-400 p-2 hover:bg-slate-100 rounded-full transition-colors">
+                                                        {isExpanded ? <ChevronUpIcon className="w-6 h-6"/> : <ChevronDownIcon className="w-6 h-6"/>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Expanded Form */}
+                                        {isExpanded && (
+                                            <div className="border-t border-slate-100 bg-slate-50 p-6 cursor-default">
+                                                
+                                                {/* Status Selector & Settings Button */}
+                                                <div className="flex justify-between items-start mb-6">
+                                                    <div className="w-auto">
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">ステータス変更</label>
+                                                        <div className="relative">
+                                                            <select value={p.projectStatus} onChange={(e) => handleUpdateProject(p.id, { projectStatus: e.target.value })} className="w-40 appearance-none bg-white border border-slate-300 text-slate-900 text-sm rounded focus:ring-brand-500 focus:border-brand-500 block p-2 font-bold shadow-sm">
+                                                                {PROJECT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                            </select>
+                                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-700"><ChevronDownIcon className="w-4 h-4"/></div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <button 
+                                                        onClick={() => setEditingProject(p)}
+                                                        className="flex items-center text-xs font-bold text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded shadow-sm hover:bg-slate-50 transition"
+                                                    >
+                                                        <SettingsIcon className="w-4 h-4 mr-1.5" /> PJ詳細設定
+                                                    </button>
+                                                </div>
+
+                                                {/* Compact Task Status Grid - Optimized for height */}
+                                                <div className="mb-6 overflow-x-auto">
+                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">工程進捗状況</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                                                        {TARGET_TASKS.map(task => {
+                                                            const kPlan = `task_${task.key}_plan`;
+                                                            const kActual = `task_${task.key}_actual`;
+                                                            const kStatus = `task_${task.key}_status`;
+                                                            const kAssignee = `task_${task.key}_assignee`;
+                                                            const status = p[kStatus] || '-';
+                                                            const isCompleted = status === '完了';
+                                                            
+                                                            // Check if actual date exists (for graying out)
+                                                            const hasActual = p[kActual] && p[kActual] !== '';
+
+                                                            return (
+                                                                <div key={task.key} className={`bg-white border border-slate-200 rounded p-1.5 text-[10px] shadow-sm flex flex-col justify-between h-full ${hasActual ? 'bg-gray-100 text-gray-400' : ''}`}>
+                                                                    <div className="flex justify-between items-center mb-1 border-b border-slate-100 pb-1">
+                                                                        <span className={`font-bold truncate ${hasActual ? 'text-gray-500' : 'text-slate-700'}`} title={task.shortName || task.name}>{task.shortName || task.name}</span>
+                                                                        <span className={`font-bold ml-1 whitespace-nowrap ${isCompleted ? (hasActual ? 'text-green-800/50' : 'text-green-600') : (hasActual ? 'text-gray-400' : 'text-slate-400')}`}>{status}</span>
+                                                                    </div>
+                                                                    <div className={`space-y-0.5 ${hasActual ? 'text-gray-400' : 'text-slate-500'}`}>
+                                                                        <div className="flex justify-between"><span>予:</span> <span>{formatDateShort(p[kPlan])}</span></div>
+                                                                        <div className="flex justify-between"><span>完:</span> <span>{formatDateShort(p[kActual])}</span></div>
+                                                                        <div className={`flex justify-between border-t pt-0.5 mt-0.5 ${hasActual ? 'border-gray-200' : 'border-slate-50'}`}>
+                                                                            <UserIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                                                            <span className="text-right break-words flex-1 ml-1" title={p[kAssignee]}>{p[kAssignee] || '-'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+
+                                                {/* Memo & Actions */}
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">概要・メモ</label>
+                                                        <textarea 
+                                                            defaultValue={p.description} 
+                                                            onBlur={(e) => handleUpdateProject(p.id, { description: e.target.value })} 
+                                                            rows="2" 
+                                                            className="w-full bg-white border border-slate-200 rounded p-2 text-sm focus:ring-brand-500 focus:border-brand-500 outline-none resize-none overflow-hidden" 
+                                                            ref={setInitialTextareaHeight} 
+                                                            onInput={autoResizeTextarea}
+                                                        ></textarea>
+                                                    </div>
+                                                    <div className="flex justify-end gap-3 pt-2 border-t border-slate-200">
+                                                        {p.status === 'active' ? (
+                                                            <button onClick={() => handleArchiveProject(p.id)} className="text-xs font-bold text-slate-500 hover:text-brand-600 flex items-center px-3 py-2 rounded hover:bg-white transition"><ArchiveIcon className="w-4 h-4 mr-2"/> CLOSEする</button>
+                                                        ) : (
+                                                            <button onClick={() => handleRestoreProject(p.id)} className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition">再開</button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                } else {
+                    // Sidebar (WBS Mode)
+                    return (
+                        <div className="space-y-3">
+                            {filteredProjects.map(p => {
+                                const isExpanded = expandedProjectIds.has(p.id);
+                                const isActivePreview = activeWbsUrl && activeWbsUrl.includes(p.wbsUrl?.replace(/\/edit.*$/, '')); 
+
+                                return (
+                                    <div key={p.id} className={`bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden transition-all ${isActivePreview ? 'ring-2 ring-brand-500' : 'hover:shadow-md'}`}>
+                                        <div className="relative cursor-pointer" onClick={(e) => {
+                                            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea')) return;
+                                            handleSelectProject(p);
+                                        }}>
+                                            <div className={`h-1.5 w-full transition-colors duration-500 ${getStatusBannerColor(p.projectStatus)}`}></div>
+                                            <div className="p-3">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-sm font-bold text-slate-900 leading-tight mb-1 truncate" title={p.name}>{p.name}</h3>
+                                                        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded text-white font-medium whitespace-nowrap ${getStatusBannerColor(p.projectStatus)}`}>{p.projectStatus || '未設定'}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-between items-end text-[10px] text-slate-500 font-mono">
+                                                    <div>
+                                                        {p.pwbs && <span>{p.pwbs}{p.sakuban ? `-${p.sakuban}` : ''}</span>}
+                                                        {p.estimateNo && <div className="text-[9px] text-slate-400">{p.estimateNo}</div>}
+                                                    </div>
+                                                    <div className="font-bold text-slate-700">{formatProgress(p.wbsProgress)}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                }
+            };
+
+            return (
+                <div className="flex h-screen bg-slate-50 font-sans text-slate-600 overflow-hidden">
+                    {/* Main Layout */}
+                    {activeWbsUrl ? (
+                        <>
+                            {/* Left Sidebar */}
+                            <div className="w-[10%] bg-white border-r border-slate-200 flex flex-col min-w-[250px]">
+                                <div className="p-4 border-b border-slate-200 bg-white z-10">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="bg-brand-600 text-white p-1.5 rounded-lg"><BriefcaseIcon className="w-4 h-4" /></div>
+                                        <h1 className="text-sm font-bold text-slate-900 tracking-tight">ムラシスクリーン作業一覧2026</h1>
+                                    </div>
+                                    <button onClick={() => setIsProjectModalOpen(true)} className="w-full inline-flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-xs mb-3">
+                                        <PlusIcon className="w-3 h-3 mr-2"/> 新規プロジェクト
+                                    </button>
+                                    <div className="flex justify-between items-center gap-2">
+                                        <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg flex-1">
+                                            <button onClick={() => setTab('active')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>進行中</button>
+                                            <button onClick={() => setTab('archive')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>完了</button>
+                                        </div>
+                                        <button onClick={handleSyncWbs} disabled={syncing} title="進捗全同期" className={`p-1.5 rounded-lg transition border border-slate-200 ${syncing ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <RefreshIcon className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-3 bg-slate-50">
+                                    {renderProjectList(true)}
+                                </div>
+                            </div>
+
+                            {/* WBS Preview Area */}
+                            <div className="w-[90%] bg-slate-100 flex flex-col h-full relative">
+                                <div className="flex-1 w-full h-full p-4">
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 w-full h-full overflow-hidden flex flex-col">
+                                        <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between items-center">
+                                            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                                                <FileTextIcon className="w-4 h-4 mr-2"/> WBS Preview (Edit Mode)
+                                            </h2>
+                                            <div className="flex items-center gap-4">
+                                                <a href={activeWbsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:text-brand-800 font-medium flex items-center">
+                                                    別タブで開く <ExternalLinkIcon className="w-3 h-3 ml-1"/>
+                                                </a>
+                                                <button 
+                                                    onClick={() => setActiveWbsUrl(null)} 
+                                                    className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded p-1 transition"
+                                                    title="閉じる"
+                                                >
+                                                    <XIcon className="w-5 h-5"/>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 w-full h-full relative overflow-hidden bg-slate-50">
+                                            <iframe
+                                                src={activeWbsUrl}
+                                                className="border-none absolute top-0 left-0"
+                                                style={{ width: '111.11%', height: '111.11%', transform: 'scale(0.9)', transformOrigin: 'top left' }}
+                                                title="WBS Preview"
+                                                allow="autoplay"
+                                            ></iframe>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        /* Full View */
+                        <div className="w-full flex flex-col h-full overflow-y-auto">
+                            <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm px-4 sm:px-6 lg:px-8">
+                                <div className="flex justify-between h-16 items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-brand-600 text-white p-2 rounded-lg"><BriefcaseIcon className="w-5 h-5" /></div>
+                                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">ムラシスクリーン作業一覧2026</h1>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg">
+                                            <button onClick={() => setTab('active')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>進行中</button>
+                                            <button onClick={() => setTab('archive')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>完了</button>
+                                        </div>
+                                        <button onClick={() => setIsProjectModalOpen(true)} className="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-sm">
+                                            <PlusIcon className="w-4 h-4 mr-2"/> 新規プロジェクト
+                                        </button>
+                                        <button 
+                                            onClick={handleSyncWbs} 
+                                            disabled={syncing}
+                                            className={`flex items-center text-sm font-medium px-3 py-2 rounded-lg transition ${syncing ? 'text-slate-400' : 'text-brand-600 hover:bg-brand-50'}`}
+                                            title="進捗全同期"
+                                        >
+                                            <RefreshIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                                            {syncing ? '同期中...' : '進捗全同期'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </nav>
+
+                            <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+                                {renderProjectList(false)}
+                            </main>
+                        </div>
+                    )}
+
+                    {/* New Project Modal */}
+                    {isProjectModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+                                <h2 className="text-xl font-bold mb-4">新規プロジェクト作成</h2>
+                                <div className="mb-4">
+                                    <label className="block text-xs font-bold text-brand-600 uppercase mb-2">Excelから貼り付け (スマートペースト)</label>
+                                    <textarea className="w-full h-20 px-3 py-2 border border-brand-200 bg-brand-50 rounded-lg text-xs font-mono focus:ring-2 focus:ring-brand-500 outline-none" placeholder={`行をコピーして貼り付け...\n例: 見積No | 内容 | 物件 | (無視) | PWBS | 作番 | PJ | 納期`} onChange={handleSmartPaste}></textarea>
+                                </div>
+                                <div className="border-t border-slate-100 my-4"></div>
+                                <form onSubmit={handleCreateProject}>
+                                    <div className="space-y-4">
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">プロジェクト名</label><input name="name" value={projectForm.name} onChange={(e) => setProjectForm({...projectForm, name: e.target.value})} required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"/></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">物件</label><input name="siteName" value={projectForm.siteName} onChange={(e) => setProjectForm({...projectForm, siteName: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJコード</label><input name="code" value={projectForm.code} onChange={(e) => setProjectForm({...projectForm, code: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">納期</label><input type="date" name="deadline" value={projectForm.deadline} onChange={(e) => setProjectForm({...projectForm, deadline: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">見積依頼No</label><input name="estimateNo" value={projectForm.estimateNo} onChange={(e) => setProjectForm({...projectForm, estimateNo: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" value={projectForm.pwbs} onChange={(e) => setProjectForm({...projectForm, pwbs: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">作番</label><input name="sakuban" value={projectForm.sakuban} onChange={(e) => setProjectForm({...projectForm, sakuban: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        </div>
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">概要</label><textarea name="description" value={projectForm.description} onChange={(e) => setProjectForm({...projectForm, description: e.target.value})} rows="3" className="w-full px-3 py-2 border rounded-lg outline-none"></textarea></div>
+                                    </div>
+                                    <div className="flex gap-3 mt-6">
+                                        <button type="button" onClick={() => setIsProjectModalOpen(false)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">キャンセル</button>
+                                        <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50">
+                                            {loading ? '作成中...' : '作成'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Settings Modal */}
+                    {editingProject && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+                                <h2 className="text-xl font-bold mb-4">プロジェクト詳細設定</h2>
+                                <form onSubmit={handleSaveSettings}>
+                                    <div className="space-y-4">
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">プロジェクト名</label><input name="name" defaultValue={editingProject.name} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">物件</label><input name="siteName" defaultValue={editingProject.siteName} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJコード</label><input name="code" defaultValue={editingProject.code} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" defaultValue={editingProject.pwbs} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">作番</label><input name="sakuban" defaultValue={editingProject.sakuban} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">見積依頼No</label><input name="estimateNo" defaultValue={editingProject.estimateNo} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">納期</label><input type="date" name="deadline" defaultValue={editingProject.deadline} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        </div>
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">WBS URL</label><input name="wbsUrl" defaultValue={editingProject.wbsUrl} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="https://..."/></div>
+                                    </div>
+                                    <div className="flex gap-3 mt-6">
+                                        <button type="button" onClick={() => setEditingProject(null)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">キャンセル</button>
+                                        <button type="submit" className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">保存</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

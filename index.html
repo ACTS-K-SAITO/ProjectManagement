@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ÉÄÉâÉVÉXÉNÉäÅ[ÉìçÏã∆àÍóó2026</title>
+    <title>„É†„É©„Ç∑„Çπ„ÇØ„É™„Éº„É≥‰ΩúÊ•≠‰∏ÄË¶ß2026</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -44,6 +44,22 @@
         
         /* Error Overlay */
         #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; padding: 20px; color: red; overflow: auto; }
+
+        /* Animation for Split View Entry */
+        @keyframes slideInRight {
+            0% { opacity: 0; transform: translateX(30px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeInLeft {
+            0% { opacity: 0; transform: translateX(-30px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        .animate-slide-in-right {
+            animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-fade-in-left {
+            animation: fadeInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
 </head>
 <body>
@@ -87,8 +103,8 @@
                         wbsProgress: Math.random(), 
                         manDays: (Math.random() * 50).toFixed(1),
                         manMonths: (Math.random() * 2.5).toFixed(2),
-                        task_revInternal_plan: '2025/05/01', task_revInternal_status: 'äÆóπ', task_revInternal_assignee: 'ç≤ì°',
-                        task_revMurasys_plan: '2025/05/10', task_revMurasys_status: 'ó\íË',
+                        task_revInternal_plan: '2025/05/01', task_revInternal_status: 'ÂÆå‰∫Ü', task_revInternal_assignee: '‰ΩêËó§',
+                        task_revMurasys_plan: '2025/05/10', task_revMurasys_status: '‰∫àÂÆö',
                     })); 
                     setTimeout(() => onSuccess({ projects: [...mockProjects] }), 1000);
                 } else {
@@ -135,19 +151,19 @@
 
         // --- Constants ---
         const PROJECT_STATUS_OPTIONS = [
-            "éëóøéÛóÃë“Çø", "ê¨â ï®çÏê¨íÜ", "é–ì‡ÉåÉrÉÖÅ[ë“Çø", "ÉÄÉâÉVÉXÉåÉrÉÖÅ[ë“Çø",
-            "ìùçáééå±èÄîıíÜ", "ìùçáééå±íÜ", "é–ì‡åüèÿèÄîıíÜ", "é–ì‡åüèÿíÜ",
-            "ÉVÉXÉeÉÄåüèÿë“Çø", "ÉVÉXÉeÉÄåüèÿíÜ", "ëÊéOé“åüèÿë“Çø", "ëÊéOé“åüèÿíÜ",
-            "äÆóπ", "çÏã∆ï€óØíÜ", "VAO/MCSééå±ë“Çø", "VAO/MCSééå±íÜ", "èoí£íÜ", "êøãÅçœ"
+            "Ë≥áÊñôÂèóÈ†òÂæÖ„Å°", "ÊàêÊûúÁâ©‰ΩúÊàê‰∏≠", "Á§æÂÜÖ„É¨„Éì„É•„ÉºÂæÖ„Å°", "„É†„É©„Ç∑„Çπ„É¨„Éì„É•„ÉºÂæÖ„Å°",
+            "Áµ±ÂêàË©¶È®ìÊ∫ñÂÇô‰∏≠", "Áµ±ÂêàË©¶È®ì‰∏≠", "Á§æÂÜÖÊ§úË®ºÊ∫ñÂÇô‰∏≠", "Á§æÂÜÖÊ§úË®º‰∏≠",
+            "„Ç∑„Çπ„ÉÜ„É†Ê§úË®ºÂæÖ„Å°", "„Ç∑„Çπ„ÉÜ„É†Ê§úË®º‰∏≠", "Á¨¨‰∏âËÄÖÊ§úË®ºÂæÖ„Å°", "Á¨¨‰∏âËÄÖÊ§úË®º‰∏≠",
+            "ÂÆå‰∫Ü", "‰ΩúÊ•≠‰øùÁïô‰∏≠", "VAO/MCSË©¶È®ìÂæÖ„Å°", "VAO/MCSË©¶È®ì‰∏≠", "Âá∫Âºµ‰∏≠", "Ë´ãÊ±ÇÊ∏à"
         ];
 
         const TARGET_TASKS = [
-          { key: 'revInternal', name: 'íËã`ÉåÉrÉÖÅ[(é–ì‡)', shortName: 'é–ì‡ÉåÉrÉÖÅ[' },
-          { key: 'revMurasys',  name: 'íËã`ÉåÉrÉÖÅ[(ÉÄÉâÉVÉX)', shortName: 'ÉÄÉâÉVÉXÉåÉrÉÖÅ[' },
-          { key: 'testInteg',   name: 'ìùçáééå±', shortName: 'ìùçáééå±' },
-          { key: 'testActs',    name: 'ACTSé–ì‡åüèÿ', shortName: 'ACTSåüèÿ' },
-          { key: 'testSystem',  name: 'ÉVÉXÉeÉÄåüèÿ', shortName: 'ÉVÉXÉeÉÄåüèÿ' },
-          { key: 'test3rd',     name: 'ëÊéOé“åüèÿ', shortName: 'ëÊéOé“åüèÿ' }
+          { key: 'revInternal', name: 'ÂÆöÁæ©„É¨„Éì„É•„Éº(Á§æÂÜÖ)', shortName: 'Á§æÂÜÖ„É¨„Éì„É•„Éº' },
+          { key: 'revMurasys',  name: 'ÂÆöÁæ©„É¨„Éì„É•„Éº(„É†„É©„Ç∑„Çπ)', shortName: '„É†„É©„Ç∑„Çπ„É¨„Éì„É•„Éº' },
+          { key: 'testInteg',   name: 'Áµ±ÂêàË©¶È®ì', shortName: 'Áµ±ÂêàË©¶È®ì' },
+          { key: 'testActs',    name: 'ACTSÁ§æÂÜÖÊ§úË®º', shortName: 'ACTSÊ§úË®º' },
+          { key: 'testSystem',  name: '„Ç∑„Çπ„ÉÜ„É†Ê§úË®º', shortName: '„Ç∑„Çπ„ÉÜ„É†Ê§úË®º' },
+          { key: 'test3rd',     name: 'Á¨¨‰∏âËÄÖÊ§úË®º', shortName: 'Á¨¨‰∏âËÄÖÊ§úË®º' }
         ];
 
         // --- Main App Component ---
@@ -252,7 +268,7 @@
                     deadline: (projectForm.deadline || '').toString(),
                     description: (projectForm.description || '').toString(),
                     status: 'active',
-                    projectStatus: "éëóøéÛóÃë“Çø"
+                    projectStatus: "Ë≥áÊñôÂèóÈ†òÂæÖ„Å°"
                 };
 
                 backend.createProject(
@@ -263,11 +279,11 @@
                         setLoading(false); 
                         setIsProjectModalOpen(false); 
                         setProjectForm({ name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '' }); 
-                        alert("ÉvÉçÉWÉFÉNÉgÇçÏê¨ÇµÇ‹ÇµÇΩÅB");
+                        alert("„Éó„É≠„Ç∏„Çß„ÇØ„Éà„Çí‰ΩúÊàê„Åó„Åæ„Åó„Åü„ÄÇ");
                     },
                     (err) => { 
                         isSaving.current = false;
-                        alert("çÏê¨ÉGÉâÅ[: " + err); 
+                        alert("‰ΩúÊàê„Ç®„É©„Éº: " + err); 
                         setLoading(false); 
                     }
                 );
@@ -310,11 +326,11 @@
             };
 
             const handleArchiveProject = (id) => {
-                if(confirm("äÆóπÅiÉAÅ[ÉJÉCÉuÅjÇµÇ‹Ç∑Ç©ÅH")) handleUpdateProject(id, { status: 'completed' });
+                if(confirm("ÂÆå‰∫ÜÔºà„Ç¢„Éº„Ç´„Ç§„ÉñÔºâ„Åó„Åæ„Åô„ÅãÔºü")) handleUpdateProject(id, { status: 'completed' });
             };
 
             const handleRestoreProject = (id) => {
-                if(confirm("ÉAÉNÉeÉBÉuÇ…ñﬂÇµÇ‹Ç∑Ç©ÅH")) handleUpdateProject(id, { status: 'active' });
+                if(confirm("„Ç¢„ÇØ„ÉÜ„Ç£„Éñ„Å´Êàª„Åó„Åæ„Åô„ÅãÔºü")) handleUpdateProject(id, { status: 'active' });
             };
 
             const handleSmartPaste = (e) => {
@@ -325,7 +341,7 @@
                 const cols = lines[0].split('\t');
                 
                 if (cols.length < 5) {
-                    alert("óÒêîÇ™ïsë´ÇµÇƒÇ¢Ç‹Ç∑ÅBExcelÇ©ÇÁçsëSëÃÇÉRÉsÅ[ÇµÇƒÇ≠ÇæÇ≥Ç¢ÅB");
+                    alert("ÂàóÊï∞„Åå‰∏çË∂≥„Åó„Å¶„ÅÑ„Åæ„Åô„ÄÇExcel„Åã„ÇâË°åÂÖ®‰Ωì„Çí„Ç≥„Éî„Éº„Åó„Å¶„Åè„Å†„Åï„ÅÑ„ÄÇ");
                     return;
                 }
 
@@ -335,7 +351,7 @@
                 const siteCode = cols[3] || '';
                 
                 const siteNameParts = [siteNameRaw];
-                if (siteCode && !siteCode.includes('íSìñ') && !siteCode.includes('CSPA4') && siteCode.trim() !== '') {
+                if (siteCode && !siteCode.includes('ÊãÖÂΩì') && !siteCode.includes('CSPA4') && siteCode.trim() !== '') {
                     siteNameParts.push(siteCode);
                 }
                 const siteName = siteNameParts.join(' ').trim();
@@ -410,10 +426,10 @@
 
             const getStatusBannerColor = (status) => {
                  const s = status || '';
-                 if (s === 'äÆóπ' || s === 'êøãÅçœ') return 'bg-slate-600';
-                 if (s.includes('íÜ') || s.includes('çÏê¨')) return 'bg-brand-600';
-                 if (s.includes('ë“Çø') || s.includes('èÄîı')) return 'bg-amber-500';
-                 if (s.includes('ï€óØ')) return 'bg-red-500';
+                 if (s === 'ÂÆå‰∫Ü' || s === 'Ë´ãÊ±ÇÊ∏à') return 'bg-slate-600';
+                 if (s.includes('‰∏≠') || s.includes('‰ΩúÊàê')) return 'bg-brand-600';
+                 if (s.includes('ÂæÖ„Å°') || s.includes('Ê∫ñÂÇô')) return 'bg-amber-500';
+                 if (s.includes('‰øùÁïô')) return 'bg-red-500';
                  return 'bg-brand-600';
             };
 
@@ -466,7 +482,7 @@
                 if (loading) return <div className="text-center py-10 text-sm w-full">Loading...</div>;
                 if (filteredProjects.length === 0) return (
                     <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl bg-white w-full">
-                        <p className="text-sm text-slate-400">ÉvÉçÉWÉFÉNÉgÇ»Çµ</p>
+                        <p className="text-sm text-slate-400">„Éó„É≠„Ç∏„Çß„ÇØ„Éà„Å™„Åó</p>
                     </div>
                 );
 
@@ -495,13 +511,13 @@
                                                                 {p.siteName}
                                                             </div>
                                                         )}
-                                                        <span className={`inline-block text-sm px-2 py-0.5 rounded text-white font-medium whitespace-nowrap ${getStatusBannerColor(p.projectStatus)}`}>{p.projectStatus || 'ñ¢ê›íË'}</span>
+                                                        <span className={`inline-block text-sm px-2 py-0.5 rounded text-white font-medium whitespace-nowrap ${getStatusBannerColor(p.projectStatus)}`}>{p.projectStatus || 'Êú™Ë®≠ÂÆö'}</span>
                                                     </div>
                                                     <h3 className="text-xl font-bold text-slate-900 leading-tight truncate mb-1" title={p.name}>{p.name}</h3>
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 font-mono">
                                                         {/* PJ Code Removed per request */}
-                                                        {p.pwbs && <span className="flex items-center"><span className="text-slate-400 mr-1">çÏî‘:</span>{p.pwbs}{p.sakuban ? `-${p.sakuban}` : ''}</span>}
-                                                        {p.estimateNo && <span className="flex items-center"><span className="text-slate-400 mr-1">å©êœ:</span>{p.estimateNo}</span>}
+                                                        {p.pwbs && <span className="flex items-center"><span className="text-slate-400 mr-1">‰ΩúÁï™:</span>{p.pwbs}{p.sakuban ? `-${p.sakuban}` : ''}</span>}
+                                                        {p.estimateNo && <span className="flex items-center"><span className="text-slate-400 mr-1">Ë¶ãÁ©ç:</span>{p.estimateNo}</span>}
                                                     </div>
                                                 </div>
 
@@ -510,8 +526,8 @@
                                                     
                                                     {/* Cost Info */}
                                                     <div className="text-right flex flex-col items-end text-sm font-mono text-slate-500">
-                                                        <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manDays, 1)}</span>êlì˙</div>
-                                                        <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manMonths, 2)}</span>êlåé</div>
+                                                        <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manDays, 1)}</span>‰∫∫Êó•</div>
+                                                        <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manMonths, 2)}</span>‰∫∫Êúà</div>
                                                     </div>
 
                                                     {/* Progress */}
@@ -532,7 +548,7 @@
                                                             e.stopPropagation();
                                                             if (p.wbsUrl) handleSelectProject(p);
                                                         }}
-                                                        title={p.wbsUrl ? "WBSÇäJÇ≠ÅiâÊñ ï™äÑÅj" : "WBSÉäÉìÉNÇ»Çµ"}
+                                                        title={p.wbsUrl ? "WBS„ÇíÈñã„ÅèÔºàÁîªÈù¢ÂàÜÂâ≤Ôºâ" : "WBS„É™„É≥„ÇØ„Å™„Åó"}
                                                     >
                                                         <FileTextIcon className="w-8 h-8 mb-1" />
                                                         <span className="text-sm font-bold">WBS</span>
@@ -553,7 +569,7 @@
                                                 {/* Status Selector & Settings Button */}
                                                 <div className="flex justify-between items-start mb-6">
                                                     <div className="w-auto">
-                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">ÉXÉeÅ[É^ÉXïœçX</label>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">„Çπ„ÉÜ„Éº„Çø„ÇπÂ§âÊõ¥</label>
                                                         <div className="relative">
                                                             <select value={p.projectStatus} onChange={(e) => handleUpdateProject(p.id, { projectStatus: e.target.value })} className="w-40 appearance-none bg-white border border-slate-300 text-slate-900 text-sm rounded focus:ring-brand-500 focus:border-brand-500 block p-2 font-bold shadow-sm">
                                                                 {PROJECT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -566,13 +582,13 @@
                                                         onClick={() => setEditingProject(p)}
                                                         className="flex items-center text-xs font-bold text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded shadow-sm hover:bg-slate-50 transition"
                                                     >
-                                                        <SettingsIcon className="w-4 h-4 mr-1.5" /> PJè⁄ç◊ê›íË
+                                                        <SettingsIcon className="w-4 h-4 mr-1.5" /> PJË©≥Á¥∞Ë®≠ÂÆö
                                                     </button>
                                                 </div>
 
                                                 {/* Compact Task Status Grid - Optimized for height */}
                                                 <div className="mb-6 overflow-x-auto">
-                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">çHíˆêiíªèÛãµ</h4>
+                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Â∑•Á®ãÈÄ≤ÊçóÁä∂Ê≥Å</h4>
                                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                                                         {TARGET_TASKS.map(task => {
                                                             const kPlan = `task_${task.key}_plan`;
@@ -580,7 +596,7 @@
                                                             const kStatus = `task_${task.key}_status`;
                                                             const kAssignee = `task_${task.key}_assignee`;
                                                             const status = p[kStatus] || '-';
-                                                            const isCompleted = status === 'äÆóπ';
+                                                            const isCompleted = status === 'ÂÆå‰∫Ü';
                                                             
                                                             // Check if actual date exists (for graying out)
                                                             const hasActual = p[kActual] && p[kActual] !== '';
@@ -592,8 +608,8 @@
                                                                         <span className={`font-bold ml-1 whitespace-nowrap ${isCompleted ? (hasActual ? 'text-green-800/50' : 'text-green-600') : (hasActual ? 'text-gray-400' : 'text-slate-400')}`}>{status}</span>
                                                                     </div>
                                                                     <div className={`space-y-0.5 ${hasActual ? 'text-gray-400' : 'text-slate-500'}`}>
-                                                                        <div className="flex justify-between"><span>ó\:</span> <span>{formatDateShort(p[kPlan])}</span></div>
-                                                                        <div className="flex justify-between"><span>äÆ:</span> <span>{formatDateShort(p[kActual])}</span></div>
+                                                                        <div className="flex justify-between"><span>‰∫à:</span> <span>{formatDateShort(p[kPlan])}</span></div>
+                                                                        <div className="flex justify-between"><span>ÂÆå:</span> <span>{formatDateShort(p[kActual])}</span></div>
                                                                         <div className={`flex justify-between border-t pt-0.5 mt-0.5 ${hasActual ? 'border-gray-200' : 'border-slate-50'}`}>
                                                                             <UserIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
                                                                             <span className="text-right break-words flex-1 ml-1" title={p[kAssignee]}>{p[kAssignee] || '-'}</span>
@@ -608,7 +624,7 @@
                                                 {/* Memo & Actions */}
                                                 <div className="grid grid-cols-1 gap-4">
                                                     <div>
-                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">äTóvÅEÉÅÉÇ</label>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Ê¶ÇË¶Å„Éª„É°„É¢</label>
                                                         <textarea 
                                                             defaultValue={p.description} 
                                                             onBlur={(e) => handleUpdateProject(p.id, { description: e.target.value })} 
@@ -620,9 +636,9 @@
                                                     </div>
                                                     <div className="flex justify-end gap-3 pt-2 border-t border-slate-200">
                                                         {p.status === 'active' ? (
-                                                            <button onClick={() => handleArchiveProject(p.id)} className="text-xs font-bold text-slate-500 hover:text-brand-600 flex items-center px-3 py-2 rounded hover:bg-white transition"><ArchiveIcon className="w-4 h-4 mr-2"/> CLOSEÇ∑ÇÈ</button>
+                                                            <button onClick={() => handleArchiveProject(p.id)} className="text-xs font-bold text-slate-500 hover:text-brand-600 flex items-center px-3 py-2 rounded hover:bg-white transition"><ArchiveIcon className="w-4 h-4 mr-2"/> CLOSE„Åô„Çã</button>
                                                         ) : (
-                                                            <button onClick={() => handleRestoreProject(p.id)} className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition">çƒäJ</button>
+                                                            <button onClick={() => handleRestoreProject(p.id)} className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition">ÂÜçÈñã</button>
                                                         )}
                                                     </div>
                                                 </div>
@@ -652,7 +668,7 @@
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div className="flex-1 min-w-0">
                                                         <h3 className="text-sm font-bold text-slate-900 leading-tight mb-1 truncate" title={p.name}>{p.name}</h3>
-                                                        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded text-white font-medium whitespace-nowrap ${getStatusBannerColor(p.projectStatus)}`}>{p.projectStatus || 'ñ¢ê›íË'}</span>
+                                                        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded text-white font-medium whitespace-nowrap ${getStatusBannerColor(p.projectStatus)}`}>{p.projectStatus || 'Êú™Ë®≠ÂÆö'}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex justify-between items-end text-[10px] text-slate-500 font-mono">
@@ -677,22 +693,22 @@
                     {/* Main Layout */}
                     {activeWbsUrl ? (
                         <>
-                            {/* Left Sidebar */}
-                            <div className="w-[10%] bg-white border-r border-slate-200 flex flex-col min-w-[250px]">
+                            {/* Left Sidebar (with Animation) */}
+                            <div className="w-[10%] bg-white border-r border-slate-200 flex flex-col min-w-[250px] animate-fade-in-left">
                                 <div className="p-4 border-b border-slate-200 bg-white z-10">
                                     <div className="flex items-center gap-2 mb-4">
                                         <div className="bg-brand-600 text-white p-1.5 rounded-lg"><BriefcaseIcon className="w-4 h-4" /></div>
-                                        <h1 className="text-sm font-bold text-slate-900 tracking-tight">ÉÄÉâÉVÉXÉNÉäÅ[ÉìçÏã∆àÍóó2026</h1>
+                                        <h1 className="text-sm font-bold text-slate-900 tracking-tight">„É†„É©„Ç∑„Çπ„ÇØ„É™„Éº„É≥‰ΩúÊ•≠‰∏ÄË¶ß2026</h1>
                                     </div>
                                     <button onClick={() => setIsProjectModalOpen(true)} className="w-full inline-flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-xs mb-3">
-                                        <PlusIcon className="w-3 h-3 mr-2"/> êVãKÉvÉçÉWÉFÉNÉg
+                                        <PlusIcon className="w-3 h-3 mr-2"/> Êñ∞Ë¶è„Éó„É≠„Ç∏„Çß„ÇØ„Éà
                                     </button>
                                     <div className="flex justify-between items-center gap-2">
                                         <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg flex-1">
-                                            <button onClick={() => setTab('active')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>êiçsíÜ</button>
-                                            <button onClick={() => setTab('archive')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>äÆóπ</button>
+                                            <button onClick={() => setTab('active')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>ÈÄ≤Ë°å‰∏≠</button>
+                                            <button onClick={() => setTab('archive')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>ÂÆå‰∫Ü</button>
                                         </div>
-                                        <button onClick={handleSyncWbs} disabled={syncing} title="êiíªëSìØä˙" className={`p-1.5 rounded-lg transition border border-slate-200 ${syncing ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                        <button onClick={handleSyncWbs} disabled={syncing} title="ÈÄ≤ÊçóÂÖ®ÂêåÊúü" className={`p-1.5 rounded-lg transition border border-slate-200 ${syncing ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}>
                                             <RefreshIcon className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                                         </button>
                                     </div>
@@ -702,8 +718,8 @@
                                 </div>
                             </div>
 
-                            {/* WBS Preview Area */}
-                            <div className="w-[90%] bg-slate-100 flex flex-col h-full relative">
+                            {/* WBS Preview Area (with Animation) */}
+                            <div className="w-[90%] bg-slate-100 flex flex-col h-full relative animate-slide-in-right">
                                 <div className="flex-1 w-full h-full p-4">
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 w-full h-full overflow-hidden flex flex-col">
                                         <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between items-center">
@@ -712,12 +728,12 @@
                                             </h2>
                                             <div className="flex items-center gap-4">
                                                 <a href={activeWbsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:text-brand-800 font-medium flex items-center">
-                                                    ï É^ÉuÇ≈äJÇ≠ <ExternalLinkIcon className="w-3 h-3 ml-1"/>
+                                                    Âà•„Çø„Éñ„ÅßÈñã„Åè <ExternalLinkIcon className="w-3 h-3 ml-1"/>
                                                 </a>
                                                 <button 
                                                     onClick={() => setActiveWbsUrl(null)} 
                                                     className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded p-1 transition"
-                                                    title="ï¬Ç∂ÇÈ"
+                                                    title="Èñâ„Åò„Çã"
                                                 >
                                                     <XIcon className="w-5 h-5"/>
                                                 </button>
@@ -738,29 +754,29 @@
                         </>
                     ) : (
                         /* Full View */
-                        <div className="w-full flex flex-col h-full overflow-y-auto">
+                        <div className="w-full flex flex-col h-full overflow-y-auto animate-fade-in-left">
                             <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm px-4 sm:px-6 lg:px-8">
                                 <div className="flex justify-between h-16 items-center">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-brand-600 text-white p-2 rounded-lg"><BriefcaseIcon className="w-5 h-5" /></div>
-                                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">ÉÄÉâÉVÉXÉNÉäÅ[ÉìçÏã∆àÍóó2026</h1>
+                                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">„É†„É©„Ç∑„Çπ„ÇØ„É™„Éº„É≥‰ΩúÊ•≠‰∏ÄË¶ß2026</h1>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg">
-                                            <button onClick={() => setTab('active')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>êiçsíÜ</button>
-                                            <button onClick={() => setTab('archive')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>äÆóπ</button>
+                                            <button onClick={() => setTab('active')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>ÈÄ≤Ë°å‰∏≠</button>
+                                            <button onClick={() => setTab('archive')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>ÂÆå‰∫Ü</button>
                                         </div>
                                         <button onClick={() => setIsProjectModalOpen(true)} className="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-sm">
-                                            <PlusIcon className="w-4 h-4 mr-2"/> êVãKÉvÉçÉWÉFÉNÉg
+                                            <PlusIcon className="w-4 h-4 mr-2"/> Êñ∞Ë¶è„Éó„É≠„Ç∏„Çß„ÇØ„Éà
                                         </button>
                                         <button 
                                             onClick={handleSyncWbs} 
                                             disabled={syncing}
                                             className={`flex items-center text-sm font-medium px-3 py-2 rounded-lg transition ${syncing ? 'text-slate-400' : 'text-brand-600 hover:bg-brand-50'}`}
-                                            title="êiíªëSìØä˙"
+                                            title="ÈÄ≤ÊçóÂÖ®ÂêåÊúü"
                                         >
                                             <RefreshIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                                            {syncing ? 'ìØä˙íÜ...' : 'êiíªëSìØä˙'}
+                                            {syncing ? 'ÂêåÊúü‰∏≠...' : 'ÈÄ≤ÊçóÂÖ®ÂêåÊúü'}
                                         </button>
                                     </div>
                                 </div>
@@ -776,33 +792,33 @@
                     {isProjectModalOpen && (
                         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-                                <h2 className="text-xl font-bold mb-4">êVãKÉvÉçÉWÉFÉNÉgçÏê¨</h2>
+                                <h2 className="text-xl font-bold mb-4">Êñ∞Ë¶è„Éó„É≠„Ç∏„Çß„ÇØ„Éà‰ΩúÊàê</h2>
                                 <div className="mb-4">
-                                    <label className="block text-xs font-bold text-brand-600 uppercase mb-2">ExcelÇ©ÇÁì\ÇËïtÇØ (ÉXÉ}Å[ÉgÉyÅ[ÉXÉg)</label>
-                                    <textarea className="w-full h-20 px-3 py-2 border border-brand-200 bg-brand-50 rounded-lg text-xs font-mono focus:ring-2 focus:ring-brand-500 outline-none" placeholder={`çsÇÉRÉsÅ[ÇµÇƒì\ÇËïtÇØ...\nó·: å©êœNo | ì‡óe | ï®åè | (ñ≥éã) | PWBS | çÏî‘ | PJ | î[ä˙`} onChange={handleSmartPaste}></textarea>
+                                    <label className="block text-xs font-bold text-brand-600 uppercase mb-2">Excel„Åã„ÇâË≤º„Çä‰ªò„Åë („Çπ„Éû„Éº„Éà„Éö„Éº„Çπ„Éà)</label>
+                                    <textarea className="w-full h-20 px-3 py-2 border border-brand-200 bg-brand-50 rounded-lg text-xs font-mono focus:ring-2 focus:ring-brand-500 outline-none" placeholder={`Ë°å„Çí„Ç≥„Éî„Éº„Åó„Å¶Ë≤º„Çä‰ªò„Åë...\n‰æã: Ë¶ãÁ©çNo | ÂÜÖÂÆπ | Áâ©‰ª∂ | (ÁÑ°Ë¶ñ) | PWBS | ‰ΩúÁï™ | PJ | Á¥çÊúü`} onChange={handleSmartPaste}></textarea>
                                 </div>
                                 <div className="border-t border-slate-100 my-4"></div>
                                 <form onSubmit={handleCreateProject}>
                                     <div className="space-y-4">
-                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">ÉvÉçÉWÉFÉNÉgñº</label><input name="name" value={projectForm.name} onChange={(e) => setProjectForm({...projectForm, name: e.target.value})} required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"/></div>
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">„Éó„É≠„Ç∏„Çß„ÇØ„ÉàÂêç</label><input name="name" value={projectForm.name} onChange={(e) => setProjectForm({...projectForm, name: e.target.value})} required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"/></div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">ï®åè</label><input name="siteName" value={projectForm.siteName} onChange={(e) => setProjectForm({...projectForm, siteName: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJÉRÅ[Éh</label><input name="code" value={projectForm.code} onChange={(e) => setProjectForm({...projectForm, code: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Áâ©‰ª∂</label><input name="siteName" value={projectForm.siteName} onChange={(e) => setProjectForm({...projectForm, siteName: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJ„Ç≥„Éº„Éâ</label><input name="code" value={projectForm.code} onChange={(e) => setProjectForm({...projectForm, code: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">î[ä˙</label><input type="date" name="deadline" value={projectForm.deadline} onChange={(e) => setProjectForm({...projectForm, deadline: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">å©êœàÀóäNo</label><input name="estimateNo" value={projectForm.estimateNo} onChange={(e) => setProjectForm({...projectForm, estimateNo: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Á¥çÊúü</label><input type="date" name="deadline" value={projectForm.deadline} onChange={(e) => setProjectForm({...projectForm, deadline: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ë¶ãÁ©ç‰æùÈ†ºNo</label><input name="estimateNo" value={projectForm.estimateNo} onChange={(e) => setProjectForm({...projectForm, estimateNo: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" value={projectForm.pwbs} onChange={(e) => setProjectForm({...projectForm, pwbs: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">çÏî‘</label><input name="sakuban" value={projectForm.sakuban} onChange={(e) => setProjectForm({...projectForm, sakuban: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">‰ΩúÁï™</label><input name="sakuban" value={projectForm.sakuban} onChange={(e) => setProjectForm({...projectForm, sakuban: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         </div>
-                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">äTóv</label><textarea name="description" value={projectForm.description} onChange={(e) => setProjectForm({...projectForm, description: e.target.value})} rows="3" className="w-full px-3 py-2 border rounded-lg outline-none"></textarea></div>
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ê¶ÇË¶Å</label><textarea name="description" value={projectForm.description} onChange={(e) => setProjectForm({...projectForm, description: e.target.value})} rows="3" className="w-full px-3 py-2 border rounded-lg outline-none"></textarea></div>
                                     </div>
                                     <div className="flex gap-3 mt-6">
-                                        <button type="button" onClick={() => setIsProjectModalOpen(false)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">ÉLÉÉÉìÉZÉã</button>
+                                        <button type="button" onClick={() => setIsProjectModalOpen(false)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">„Ç≠„É£„É≥„Çª„É´</button>
                                         <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50">
-                                            {loading ? 'çÏê¨íÜ...' : 'çÏê¨'}
+                                            {loading ? '‰ΩúÊàê‰∏≠...' : '‰ΩúÊàê'}
                                         </button>
                                     </div>
                                 </form>
@@ -814,27 +830,27 @@
                     {editingProject && (
                         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-                                <h2 className="text-xl font-bold mb-4">ÉvÉçÉWÉFÉNÉgè⁄ç◊ê›íË</h2>
+                                <h2 className="text-xl font-bold mb-4">„Éó„É≠„Ç∏„Çß„ÇØ„ÉàË©≥Á¥∞Ë®≠ÂÆö</h2>
                                 <form onSubmit={handleSaveSettings}>
                                     <div className="space-y-4">
-                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">ÉvÉçÉWÉFÉNÉgñº</label><input name="name" defaultValue={editingProject.name} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">„Éó„É≠„Ç∏„Çß„ÇØ„ÉàÂêç</label><input name="name" defaultValue={editingProject.name} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">ï®åè</label><input name="siteName" defaultValue={editingProject.siteName} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJÉRÅ[Éh</label><input name="code" defaultValue={editingProject.code} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Áâ©‰ª∂</label><input name="siteName" defaultValue={editingProject.siteName} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJ„Ç≥„Éº„Éâ</label><input name="code" defaultValue={editingProject.code} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" defaultValue={editingProject.pwbs} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">çÏî‘</label><input name="sakuban" defaultValue={editingProject.sakuban} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">‰ΩúÁï™</label><input name="sakuban" defaultValue={editingProject.sakuban} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">å©êœàÀóäNo</label><input name="estimateNo" defaultValue={editingProject.estimateNo} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">î[ä˙</label><input type="date" name="deadline" defaultValue={editingProject.deadline} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ë¶ãÁ©ç‰æùÈ†ºNo</label><input name="estimateNo" defaultValue={editingProject.estimateNo} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Á¥çÊúü</label><input type="date" name="deadline" defaultValue={editingProject.deadline} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         </div>
                                         <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">WBS URL</label><input name="wbsUrl" defaultValue={editingProject.wbsUrl} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="https://..."/></div>
                                     </div>
                                     <div className="flex gap-3 mt-6">
-                                        <button type="button" onClick={() => setEditingProject(null)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">ÉLÉÉÉìÉZÉã</button>
-                                        <button type="submit" className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">ï€ë∂</button>
+                                        <button type="button" onClick={() => setEditingProject(null)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">„Ç≠„É£„É≥„Çª„É´</button>
+                                        <button type="submit" className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">‰øùÂ≠ò</button>
                                     </div>
                                 </form>
                             </div>

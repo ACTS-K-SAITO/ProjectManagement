@@ -104,6 +104,7 @@
                         .apiGetData();
                 }
             },
+            // get user removed as it is now handled server-side for memo
             syncWbsProgress: (onSuccess, onFailure) => {
                 if (isPreview) {
                     // Mock data for preview
@@ -123,7 +124,7 @@
             createProject: (project, onSuccess, onFailure) => {
                 if (isPreview) {
                     if(!project.id) project.id = Math.random().toString(36).substr(2, 9);
-                    project.wbsUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_example/pubhtml"; 
+                    if(!project.skipWbs) project.wbsUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_example/pubhtml"; 
                     mockProjects.push(project);
                     setTimeout(() => onSuccess({ projects: [...mockProjects] }), 1500);
                 } else {
@@ -137,6 +138,63 @@
                     setTimeout(() => onSuccess({ projects: [...mockProjects] }), 500);
                 } else {
                     google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiUpdateProject(project);
+                }
+            },
+            addMemo: (projectId, text, onSuccess, onFailure) => {
+                if (isPreview) {
+                    const idx = mockProjects.findIndex(p => p.id === projectId);
+                    if(idx >= 0) {
+                         const now = new Date();
+                         const timeStr = now.getFullYear() + "/" + ("0"+(now.getMonth()+1)).slice(-2) + "/" + ("0"+now.getDate()).slice(-2) + " " + ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2);
+                         const name = "demo"; // Mock user name
+                         const newEntry = `[${timeStr} ${name}]\n${text}`;
+                         const old = mockProjects[idx].description || "";
+                         mockProjects[idx].description = newEntry + "\n\n" + old;
+                    }
+                    setTimeout(() => onSuccess({ projects: [...mockProjects] }), 500);
+                } else {
+                     // No longer passing username from client
+                     google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiAddMemo(projectId, text);
+                }
+            },
+            editMemo: (projectId, oldRaw, newText, onSuccess, onFailure) => {
+                if (isPreview) {
+                     const idx = mockProjects.findIndex(p => p.id === projectId);
+                     if (idx >= 0 && mockProjects[idx].description) {
+                         // Improved regex split for preview as well
+                         const rawEntries = mockProjects[idx].description.split(/(?=\[\d{4}\/\d{2}\/\d{2} \d{2}:\d{2} )/g);
+                         const targetIdx = rawEntries.findIndex(e => e.trim() === oldRaw.trim());
+                         if (targetIdx !== -1) {
+                             const original = rawEntries[targetIdx];
+                             const trailing = original.replace(original.trimEnd(), '');
+                             const match = original.trim().match(/^\[(.*?)\]/);
+                             let newEntry = newText;
+                             if(match) {
+                                 newEntry = match[0] + '\n' + newText;
+                             }
+                             rawEntries[targetIdx] = newEntry + trailing;
+                             mockProjects[idx].description = rawEntries.join('');
+                         }
+                     }
+                     setTimeout(() => onSuccess({ projects: [...mockProjects] }), 500);
+                } else {
+                    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiEditMemo(projectId, oldRaw, newText);
+                }
+            },
+            deleteMemo: (projectId, entryContent, onSuccess, onFailure) => {
+                if (isPreview) {
+                     const idx = mockProjects.findIndex(p => p.id === projectId);
+                     if (idx >= 0 && mockProjects[idx].description) {
+                         const rawEntries = mockProjects[idx].description.split(/(?=\[\d{4}\/\d{2}\/\d{2} \d{2}:\d{2} )/g);
+                         const targetIdx = rawEntries.findIndex(e => e.trim() === entryContent.trim());
+                         if (targetIdx !== -1) {
+                             rawEntries.splice(targetIdx, 1);
+                             mockProjects[idx].description = rawEntries.join('').trim();
+                         }
+                     }
+                     setTimeout(() => onSuccess({ projects: [...mockProjects] }), 500);
+                } else {
+                    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiDeleteMemo(projectId, entryContent);
                 }
             }
         };
@@ -156,7 +214,11 @@
         const ClockIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></IconBase>);
         const XIcon = ({ className }) => (<IconBase className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></IconBase>);
         const UserIcon = ({ className }) => (<IconBase className={className}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></IconBase>);
-        const SettingsIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></IconBase>);
+        const SettingsIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></IconBase>);
+        const SendIcon = ({ className }) => (<IconBase className={className}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></IconBase>);
+        const TrashIcon = ({ className }) => (<IconBase className={className}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></IconBase>);
+        const PencilIcon = ({ className }) => (<IconBase className={className}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></IconBase>);
+        const SaveIcon = ({ className }) => (<IconBase className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></IconBase>);
 
         // --- Constants ---
         const PROJECT_STATUS_OPTIONS = [
@@ -175,6 +237,217 @@
           { key: 'test3rd',     name: '第三者検証', shortName: '第三者検証' }
         ];
 
+        // --- Sub-Component: Memo Section ---
+        function MemoSection({ project, onUpdateData }) {
+            const [memo, setMemo] = useState('');
+            const [isSending, setIsSending] = useState(false);
+            const [parsedMemos, setParsedMemos] = useState([]);
+            
+            // Edit Mode State
+            const [editingEntry, setEditingEntry] = useState(null); // The raw string of the entry being edited
+            const [editText, setEditText] = useState('');
+            const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+            // Parse memo string into structured data
+            useEffect(() => {
+                if (!project.description) {
+                    setParsedMemos([]);
+                    return;
+                }
+                
+                // Assuming separator is regex looking for [yyyy/MM/dd HH:mm Name]
+                // This correctly handles empty lines inside a message
+                const rawEntries = project.description.split(/(?=\[\d{4}\/\d{2}\/\d{2} \d{2}:\d{2} )/g);
+                
+                const parsed = rawEntries.map(entry => {
+                    const trimmed = entry.trim();
+                    if (!trimmed) return null;
+
+                    // Match "[yyyy/MM/dd HH:mm Name]"
+                    // Changed \n to \s+ to be more flexible with newlines after the header
+                    const match = trimmed.match(/^\[(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}) (.*?)\]\s+([\s\S]*)$/);
+                    
+                    if (match) {
+                        return { date: match[1], name: match[2], text: match[3], raw: trimmed, valid: true };
+                    }
+                    // Fallback for old or manually edited format
+                    return { text: trimmed, raw: trimmed, valid: false };
+                }).filter(e => e !== null);
+                setParsedMemos(parsed);
+            }, [project.description]);
+
+            const handlePost = (e) => {
+                e.preventDefault();
+                if (!memo.trim()) return;
+                
+                setIsSending(true);
+                // No username passed here, server handles it
+                backend.addMemo(project.id, memo,
+                    (data) => {
+                        setIsSending(false);
+                        setMemo('');
+                        onUpdateData(data);
+                    },
+                    (err) => {
+                        setIsSending(false);
+                        alert("メモ投稿失敗: " + err);
+                    }
+                );
+            };
+
+            const handleDelete = (entryContent) => {
+                if (!confirm("このメッセージを削除しますか？")) return;
+                
+                backend.deleteMemo(project.id, entryContent,
+                    (data) => {
+                         onUpdateData(data);
+                    },
+                    (err) => {
+                        alert("削除失敗: " + err);
+                    }
+                );
+            };
+
+            const startEdit = (m) => {
+                setEditingEntry(m.raw);
+                setEditText(m.text);
+            };
+
+            const cancelEdit = () => {
+                setEditingEntry(null);
+                setEditText('');
+            };
+
+            const saveEdit = () => {
+                if (!editText.trim()) return;
+                setIsSavingEdit(true);
+                backend.editMemo(project.id, editingEntry, editText,
+                    (data) => {
+                        setIsSavingEdit(false);
+                        setEditingEntry(null);
+                        setEditText('');
+                        onUpdateData(data);
+                    },
+                    (err) => {
+                        setIsSavingEdit(false);
+                        alert("編集保存失敗: " + err);
+                    }
+                );
+            };
+
+            return (
+                <div className="mb-4">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">プロジェクトログ</label>
+                    
+                    {/* Stylish Log Display */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 h-48 overflow-y-auto custom-scrollbar space-y-3">
+                        {parsedMemos.length === 0 ? (
+                            <div className="text-center text-slate-400 text-xs py-4 italic">No logs recorded</div>
+                        ) : (
+                            parsedMemos.map((m, idx) => (
+                                <div key={idx} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm group">
+                                    {editingEntry === m.raw ? (
+                                        /* Edit Mode */
+                                        <div className="flex flex-col gap-2 animate-expand-fade-in">
+                                            <div className="flex justify-between items-center border-b border-slate-100 pb-1 mb-1">
+                                                 <span className="text-xs text-brand-500 font-bold uppercase tracking-wide">Editing Message</span>
+                                            </div>
+                                            <textarea 
+                                                value={editText}
+                                                onChange={(e) => setEditText(e.target.value)}
+                                                className="w-full text-sm border border-brand-300 rounded p-2 focus:ring-2 focus:ring-brand-500 outline-none resize-none h-20 leading-relaxed bg-brand-50/30"
+                                            ></textarea>
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={cancelEdit} className="text-xs text-slate-500 px-3 py-1 rounded hover:bg-slate-100 font-medium transition">キャンセル</button>
+                                                <button onClick={saveEdit} disabled={isSavingEdit} className="flex items-center text-xs text-white bg-brand-600 px-3 py-1 rounded hover:bg-brand-700 font-bold transition shadow-sm">
+                                                    {isSavingEdit ? <RefreshIcon className="w-3 h-3 animate-spin mr-1"/> : <SaveIcon className="w-3 h-3 mr-1"/>} 保存
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* View Mode */
+                                        m.valid ? (
+                                            <>
+                                                <div className="flex justify-between items-center mb-1 border-b border-slate-50 pb-1">
+                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                        <UserIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                                        <span className="font-bold text-xs text-slate-700 truncate">
+                                                            {m.name.split('@')[0]}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 font-mono flex-shrink-0 ml-auto">{m.date}</span>
+                                                    </div>
+                                                    
+                                                    <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => startEdit(m)}
+                                                            className="p-1 text-slate-300 hover:text-brand-500 hover:bg-brand-50 rounded transition"
+                                                            title="編集"
+                                                        >
+                                                            <PencilIcon className="w-3 h-3" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDelete(m.raw)}
+                                                            className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition"
+                                                            title="削除"
+                                                        >
+                                                            <TrashIcon className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="text-sm text-slate-600 whitespace-pre-wrap break-words leading-relaxed">
+                                                    {m.text}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="flex justify-between items-start">
+                                                <div className="text-sm text-slate-500 whitespace-pre-wrap break-words">{m.text}</div>
+                                                <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => startEdit(m)}
+                                                        className="p-1 text-slate-300 hover:text-brand-500 hover:bg-brand-50 rounded transition"
+                                                        title="編集"
+                                                    >
+                                                        <PencilIcon className="w-3 h-3" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDelete(m.raw)}
+                                                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition"
+                                                        title="削除"
+                                                    >
+                                                        <TrashIcon className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                    
+                    {/* Input Area (No User Name Field) */}
+                    <div className="flex flex-col gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                        <div className="flex gap-2 items-end">
+                            <textarea 
+                                value={memo}
+                                onChange={(e) => setMemo(e.target.value)}
+                                placeholder="メッセージを入力..." 
+                                className="flex-1 text-sm outline-none resize-none h-12 bg-transparent leading-relaxed"
+                            ></textarea>
+                            <button 
+                                onClick={handlePost} 
+                                disabled={isSending || !memo.trim()}
+                                className="bg-brand-600 text-white rounded-lg px-3 py-2 text-xs font-bold hover:bg-brand-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center shadow-sm"
+                            >
+                                {isSending ? <RefreshIcon className="w-4 h-4 animate-spin"/> : <SendIcon className="w-4 h-4"/>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+
         // --- Main App Component ---
         function App() {
             const [projects, setProjects] = useState([]);
@@ -183,7 +456,7 @@
             const [tab, setTab] = useState('active');
             const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
             const [projectForm, setProjectForm] = useState({ 
-                name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '' 
+                name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '', skipWbs: false
             });
             const [syncing, setSyncing] = useState(false);
             const [activeWbsUrl, setActiveWbsUrl] = useState(null);
@@ -276,6 +549,7 @@
                     estimateNo: (projectForm.estimateNo || '').toString(),
                     deadline: (projectForm.deadline || '').toString(),
                     description: (projectForm.description || '').toString(),
+                    skipWbs: projectForm.skipWbs || false,
                     status: 'active',
                     projectStatus: "資料受領待ち"
                 };
@@ -287,7 +561,7 @@
                         handleUpdateData(data); 
                         setLoading(false); 
                         setIsProjectModalOpen(false); 
-                        setProjectForm({ name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '' }); 
+                        setProjectForm({ name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '', skipWbs: false }); 
                         alert("プロジェクトを作成しました。");
                     },
                     (err) => { 
@@ -503,18 +777,6 @@
                 return `${date.getMonth() + 1}/${date.getDate()}`;
             };
 
-            const autoResizeTextarea = (e) => {
-                e.target.style.height = 'auto';
-                e.target.style.height = e.target.scrollHeight + 'px';
-            };
-
-            const setInitialTextareaHeight = (el) => {
-                if (el) {
-                    el.style.height = 'auto';
-                    el.style.height = el.scrollHeight + 'px';
-                }
-            };
-
             const renderProjectList = (isCompact) => {
                 if (loading) return <div className="text-center py-10 text-sm w-full">Loading...</div>;
                 if (filteredProjects.length === 0) return (
@@ -601,92 +863,116 @@
 
                                         {/* Expanded Form */}
                                         {isExpanded && (
-                                            <div className="border-t border-slate-100 bg-slate-50 p-6 cursor-default animate-expand-fade-in">
+                                            <div className="border-t border-slate-100 bg-slate-50 p-4 cursor-default animate-expand-fade-in">
                                                 
-                                                {/* Status Selector & Settings Button */}
-                                                <div className="flex justify-between items-start mb-6">
-                                                    <div className="w-auto">
+                                                {/* Top Row: Task Status Grid & Settings Button */}
+                                                <div className="flex flex-col lg:flex-row gap-4 mb-4">
+                                                    
+                                                    {/* Compact Task Status Grid - Moved to Top */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase">工程進捗状況</h4>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 overflow-x-auto p-2 custom-scrollbar">
+                                                            {(() => {
+                                                                // アクティブ（次のタスク）を判定するロジック
+                                                                const activeTaskIndex = TARGET_TASKS.findIndex(task => {
+                                                                    const kStatus = `task_${task.key}_status`;
+                                                                    const kActual = `task_${task.key}_actual`;
+                                                                    const status = p[kStatus];
+                                                                    const hasActual = p[kActual] && p[kActual] !== '';
+                                                                    const isCompleted = status === '完了';
+                                                                    const isExcluded = status === '作業不要';
+                                                                    
+                                                                    // 完了でも作業不要でもなく、実績日も入っていない最初のタスクがアクティブ
+                                                                    return !isCompleted && !isExcluded && !hasActual;
+                                                                });
+
+                                                                return TARGET_TASKS.map((task, index) => {
+                                                                    const kPlan = `task_${task.key}_plan`;
+                                                                    const kActual = `task_${task.key}_actual`;
+                                                                    const kStatus = `task_${task.key}_status`;
+                                                                    const kAssignee = `task_${task.key}_assignee`;
+                                                                    const status = p[kStatus] || '-';
+                                                                    const isCompleted = status === '完了';
+                                                                    const isExcluded = status === '作業不要';
+                                                                    
+                                                                    // Check if actual date exists (for graying out)
+                                                                    const hasActual = p[kActual] && p[kActual] !== '';
+                                                                    
+                                                                    // グレーアウト判定 (実績あり、または作業不要)
+                                                                    const isGrayedOut = hasActual || isExcluded;
+                                                                    
+                                                                    // アクティブ判定
+                                                                    const isActive = index === activeTaskIndex;
+
+                                                                    return (
+                                                                        <React.Fragment key={task.key}>
+                                                                            <div className={`flex-shrink-0 w-36 bg-white border rounded p-2 text-[10px] shadow-sm flex flex-col justify-between h-full transition-all duration-300 ${
+                                                                                isGrayedOut ? 'bg-gray-100 text-gray-400 border-slate-200' : 
+                                                                                isActive ? 'ring-2 ring-brand-500 border-transparent z-10 scale-[1.02]' : 
+                                                                                'border-slate-200'
+                                                                            }`}>
+                                                                                    <div className="flex justify-between items-center mb-1 border-b border-slate-100 pb-1">
+                                                                                        <span className={`font-bold truncate ${isGrayedOut ? 'text-gray-500' : 'text-slate-700'}`} title={task.shortName || task.name}>{task.shortName || task.name}</span>
+                                                                                        {isActive && <span className="inline-block w-2 h-2 rounded-full bg-brand-500 ml-1"></span>}
+                                                                                    </div>
+                                                                                    <div className="text-center py-1">
+                                                                                         <span className={`font-bold text-xs ${
+                                                                                             isCompleted ? (hasActual ? 'text-green-800/50' : 'text-green-600') : 
+                                                                                             isExcluded ? 'text-gray-400' : 
+                                                                                             (hasActual ? 'text-gray-400' : 'text-slate-600')
+                                                                                         }`}>{status}</span>
+                                                                                    </div>
+                                                                                    <div className={`space-y-0.5 ${isGrayedOut ? 'text-gray-400' : 'text-slate-500'}`}>
+                                                                                        <div className="flex justify-between"><span>予定日:</span> <span>{formatDateShort(p[kPlan])}</span></div>
+                                                                                        <div className="flex justify-between"><span>完了日:</span> <span>{formatDateShort(p[kActual])}</span></div>
+                                                                                        <div className={`flex justify-between border-t pt-0.5 mt-0.5 ${isGrayedOut ? 'border-gray-200' : 'border-slate-50'}`}>
+                                                                                            <UserIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                                                                            <span className="text-right break-words flex-1 ml-1" title={p[kAssignee]}>{p[kAssignee] || '-'}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                            </div>
+                                                                            {index < TARGET_TASKS.length - 1 && (
+                                                                                <div className="text-slate-300 font-bold text-lg flex-shrink-0">&gt;</div>
+                                                                            )}
+                                                                        </React.Fragment>
+                                                                    );
+                                                                });
+                                                            })()}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Settings Button - Moved next to tasks */}
+                                                    <div className="flex-shrink-0 pt-6">
+                                                        <button 
+                                                            onClick={() => setEditingProject(p)}
+                                                            className="flex items-center text-xs font-bold text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded shadow-sm hover:bg-slate-50 transition whitespace-nowrap"
+                                                        >
+                                                            <SettingsIcon className="w-4 h-4 mr-1.5" /> PJ詳細
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Middle: Memo (Updated with MemoSection) */}
+                                                <MemoSection project={p} onUpdateData={handleUpdateData} />
+
+                                                {/* Bottom Row: Status Selector & Actions */}
+                                                <div className="flex flex-col sm:flex-row justify-between items-end gap-4 pt-3 border-t border-slate-200">
+                                                    
+                                                    {/* Status Selector - Bottom Left */}
+                                                    <div className="w-full sm:w-auto">
                                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">ステータス変更</label>
                                                         <div className="relative">
-                                                            <select value={p.projectStatus} onChange={(e) => handleUpdateProject(p.id, { projectStatus: e.target.value })} className="w-64 appearance-none bg-white border border-slate-300 text-slate-900 text-sm rounded focus:ring-brand-500 focus:border-brand-500 block p-2 font-bold shadow-sm">
+                                                            <select value={p.projectStatus} onChange={(e) => handleUpdateProject(p.id, { projectStatus: e.target.value })} className="w-full sm:w-64 appearance-none bg-white border border-slate-300 text-slate-900 text-sm rounded focus:ring-brand-500 focus:border-brand-500 block p-2 font-bold shadow-sm">
                                                                 {PROJECT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                             </select>
                                                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-700"><ChevronDownIcon className="w-4 h-4"/></div>
                                                         </div>
                                                     </div>
                                                     
-                                                    <button 
-                                                        onClick={() => setEditingProject(p)}
-                                                        className="flex items-center text-xs font-bold text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded shadow-sm hover:bg-slate-50 transition"
-                                                    >
-                                                        <SettingsIcon className="w-4 h-4 mr-1.5" /> PJ詳細
-                                                    </button>
-                                                </div>
-
-                                                {/* Compact Task Status Grid - Optimized for height */}
-                                                <div className="mb-6">
-                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">工程進捗状況</h4>
-                                                    <div className="flex items-center gap-3 overflow-x-auto pb-2 custom-scrollbar">
-                                                        {TARGET_TASKS.map((task, index) => {
-                                                            const kPlan = `task_${task.key}_plan`;
-                                                            const kActual = `task_${task.key}_actual`;
-                                                            const kStatus = `task_${task.key}_status`;
-                                                            const kAssignee = `task_${task.key}_assignee`;
-                                                            const status = p[kStatus] || '-';
-                                                            const isCompleted = status === '完了';
-                                                            const isExcluded = status === '作業不要';
-                                                            
-                                                            // Check if actual date exists (for graying out)
-                                                            const hasActual = p[kActual] && p[kActual] !== '';
-                                                            
-                                                            // グレーアウト判定 (実績あり、または作業不要)
-                                                            const isGrayedOut = hasActual || isExcluded;
-
-                                                            return (
-                                                                <React.Fragment key={task.key}>
-                                                                    <div className={`flex-shrink-0 w-36 bg-white border border-slate-200 rounded p-2 text-[10px] shadow-sm flex flex-col justify-between h-full ${isGrayedOut ? 'bg-gray-100 text-gray-400' : ''}`}>
-                                                                            <div className="flex justify-between items-center mb-1 border-b border-slate-100 pb-1">
-                                                                                <span className={`font-bold truncate ${isGrayedOut ? 'text-gray-500' : 'text-slate-700'}`} title={task.shortName || task.name}>{task.shortName || task.name}</span>
-                                                                            </div>
-                                                                            <div className="text-center py-1">
-                                                                                 <span className={`font-bold text-xs ${
-                                                                                     isCompleted ? (hasActual ? 'text-green-800/50' : 'text-green-600') : 
-                                                                                     isExcluded ? 'text-gray-400' : 
-                                                                                     (hasActual ? 'text-gray-400' : 'text-slate-600')
-                                                                                 }`}>{status}</span>
-                                                                            </div>
-                                                                            <div className={`space-y-0.5 ${isGrayedOut ? 'text-gray-400' : 'text-slate-500'}`}>
-                                                                                <div className="flex justify-between"><span>予定日:</span> <span>{formatDateShort(p[kPlan])}</span></div>
-                                                                                <div className="flex justify-between"><span>完了日:</span> <span>{formatDateShort(p[kActual])}</span></div>
-                                                                                <div className={`flex justify-between border-t pt-0.5 mt-0.5 ${isGrayedOut ? 'border-gray-200' : 'border-slate-50'}`}>
-                                                                                    <UserIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                                                                                    <span className="text-right break-words flex-1 ml-1" title={p[kAssignee]}>{p[kAssignee] || '-'}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                    </div>
-                                                                    {index < TARGET_TASKS.length - 1 && (
-                                                                        <div className="text-slate-300 font-bold text-lg flex-shrink-0">&gt;</div>
-                                                                    )}
-                                                                </React.Fragment>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-
-                                                {/* Memo & Actions */}
-                                                <div className="grid grid-cols-1 gap-4">
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">概要・メモ</label>
-                                                        <textarea 
-                                                            defaultValue={p.description} 
-                                                            onBlur={(e) => handleUpdateProject(p.id, { description: e.target.value })} 
-                                                            rows="2" 
-                                                            className="w-full bg-white border border-slate-200 rounded p-2 text-sm focus:ring-brand-500 focus:border-brand-500 outline-none resize-none overflow-hidden" 
-                                                            ref={setInitialTextareaHeight} 
-                                                            onInput={autoResizeTextarea}
-                                                        ></textarea>
-                                                    </div>
-                                                    <div className="flex justify-end gap-3 pt-2 border-t border-slate-200">
+                                                    {/* Actions (Close/Restore) - Bottom Right */}
+                                                    <div className="flex gap-3">
                                                         {p.status === 'active' ? (
                                                             <button onClick={() => handleArchiveProject(p.id)} className="text-xs font-bold text-slate-500 hover:text-brand-600 flex items-center px-3 py-2 rounded hover:bg-white transition"><ArchiveIcon className="w-4 h-4 mr-2"/> CLOSEする</button>
                                                         ) : (
@@ -866,6 +1152,19 @@
                                             <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">作番</label><input name="sakuban" value={projectForm.sakuban} onChange={(e) => setProjectForm({...projectForm, sakuban: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
                                         </div>
                                         <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">概要</label><textarea name="description" value={projectForm.description} onChange={(e) => setProjectForm({...projectForm, description: e.target.value})} rows="3" className="w-full px-3 py-2 border rounded-lg outline-none"></textarea></div>
+                                        
+                                        {/* WBS作成不要チェックボックス */}
+                                        <div className="flex items-center pt-2">
+                                            <input 
+                                                type="checkbox" 
+                                                id="skipWbs" 
+                                                checked={projectForm.skipWbs} 
+                                                onChange={(e) => setProjectForm({...projectForm, skipWbs: e.target.checked})}
+                                                className="w-4 h-4 text-brand-600 bg-gray-100 border-gray-300 rounded focus:ring-brand-500"
+                                            />
+                                            <label htmlFor="skipWbs" className="ml-2 text-xs font-bold text-slate-500 uppercase">WBS作成不要（ファイルを作成しません）</label>
+                                        </div>
+
                                     </div>
                                     <div className="flex gap-3 mt-6">
                                         <button type="button" onClick={() => setIsProjectModalOpen(false)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">キャンセル</button>

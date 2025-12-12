@@ -55,6 +55,190 @@ function apiGetData() {
   };
 }
 
+// Åö Memo Post Function
+// User name is now automatically retrieved from the session
+function apiAddMemo(projectId, text) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet(ss, SHEET_PROJECTS);
+  const lock = LockService.getScriptLock();
+  
+  try {
+    // Lock to prevent overwriting by other users/processes
+    lock.waitLock(5000);
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return apiGetData();
+    
+    const headers = data[0];
+    const idIdx = headers.indexOf('id');
+    let descIdx = headers.indexOf('description');
+    
+    if (idIdx === -1) return apiGetData();
+    
+    // Find target row
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][idIdx] === projectId) {
+        rowIndex = i + 1; // 1-based index
+        break;
+      }
+    }
+    
+    if (rowIndex > 0) {
+      // If description column doesn't exist, create it
+      if (descIdx === -1) {
+        descIdx = headers.length;
+        sheet.getRange(1, descIdx + 1).setValue('description');
+      }
+      
+      const cell = sheet.getRange(rowIndex, descIdx + 1);
+      const currentDesc = String(cell.getValue());
+      
+      const now = new Date();
+      const timeStr = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy/MM/dd HH:mm");
+      
+      // Get current user's email and remove domain part
+      const email = Session.getActiveUser().getEmail() || "Unknown";
+      const shortName = email.split('@')[0]; // Extract part before @
+      
+      // Append new memo at the top with a specific format for parsing
+      const newEntry = `[${timeStr} ${shortName}]\n${text}`;
+      const newDesc = currentDesc ? (newEntry + "\n\n" + currentDesc) : newEntry;
+      
+      cell.setValue(newDesc);
+    }
+    
+  } catch (e) {
+    console.error("Memo add failed: " + e.message);
+    throw e;
+  } finally {
+    lock.releaseLock();
+  }
+  
+  return apiGetData();
+}
+
+// Åö Memo Edit Function
+function apiEditMemo(projectId, oldEntryContent, newText) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet(ss, SHEET_PROJECTS);
+  const lock = LockService.getScriptLock();
+  
+  try {
+    lock.waitLock(5000);
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return apiGetData();
+    
+    const headers = data[0];
+    const idIdx = headers.indexOf('id');
+    const descIdx = headers.indexOf('description');
+    
+    if (idIdx === -1 || descIdx === -1) return apiGetData();
+    
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][idIdx] === projectId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+    
+    if (rowIndex > 0) {
+      const cell = sheet.getRange(rowIndex, descIdx + 1);
+      const currentDesc = String(cell.getValue());
+      
+      if (currentDesc) {
+        // Split by lookahead for timestamp header to handle multi-line messages correctly
+        const entries = currentDesc.split(/(?=\[\d{4}\/\d{2}\/\d{2} \d{2}:\d{2} )/g);
+        
+        // Find index of the entry to edit (match trimmed content to avoid whitespace issues)
+        const targetIndex = entries.findIndex(e => e.trim() === oldEntryContent.trim());
+        
+        if (targetIndex !== -1) {
+          const originalEntry = entries[targetIndex];
+          // Preserve trailing spaces/newlines of the original chunk
+          const trailingSpace = originalEntry.replace(originalEntry.trimEnd(), '');
+
+          // Attempt to preserve the header [Date Name]
+          const match = originalEntry.trim().match(/^\[(.*?)\]/);
+          let newEntry;
+          if (match) {
+             // Keep original header, update text
+             newEntry = match[0] + '\n' + newText;
+          } else {
+             // If format was broken, just use new text
+             newEntry = newText;
+          }
+          
+          entries[targetIndex] = newEntry + trailingSpace;
+          cell.setValue(entries.join(''));
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Memo edit failed: " + e.message);
+    throw e;
+  } finally {
+    lock.releaseLock();
+  }
+  
+  return apiGetData();
+}
+
+// Åö Memo Delete Function
+function apiDeleteMemo(projectId, entryContent) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet(ss, SHEET_PROJECTS);
+  const lock = LockService.getScriptLock();
+  
+  try {
+    lock.waitLock(5000);
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return apiGetData();
+    
+    const headers = data[0];
+    const idIdx = headers.indexOf('id');
+    const descIdx = headers.indexOf('description');
+    
+    if (idIdx === -1 || descIdx === -1) return apiGetData();
+    
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][idIdx] === projectId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+    
+    if (rowIndex > 0) {
+      const cell = sheet.getRange(rowIndex, descIdx + 1);
+      const currentDesc = String(cell.getValue());
+      
+      if (currentDesc) {
+        // Split by lookahead for timestamp header
+        const entries = currentDesc.split(/(?=\[\d{4}\/\d{2}\/\d{2} \d{2}:\d{2} )/g);
+        // Match trimmed content
+        const targetIndex = entries.findIndex(e => e.trim() === entryContent.trim());
+        
+        if (targetIndex !== -1) {
+          entries.splice(targetIndex, 1);
+          // Join and trim to prevent excess newlines at edges
+          cell.setValue(entries.join('').trim());
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Memo delete failed: " + e.message);
+    throw e;
+  } finally {
+    lock.releaseLock();
+  }
+  
+  return apiGetData();
+}
+
 function apiSyncWbsProgress() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const pSheet = getOrCreateSheet(ss, SHEET_PROJECTS);

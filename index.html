@@ -20,9 +20,15 @@
                 extend: {
                     colors: {
                         slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
-                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' },
+                        accent: { 500: '#10b981', 600: '#059669' } // Emerald for trips
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'card': '0 0 0 1px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04)',
+                        'floating': '0 10px 40px -10px rgba(0,0,0,0.1)'
+                    }
                 }
             }
         }
@@ -30,13 +36,14 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #555555; color: #334155; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
         .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #555555; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
         .animate-spin-slow { animation: spin 2s linear infinite; }
@@ -69,6 +76,22 @@
         .animate-expand-fade-in {
             animation: expandFadeIn 0.3s ease-out forwards;
         }
+
+        /* Toast Animation */
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up-fade {
+            animation: slideUpFade 0.3s ease-out forwards;
+        }
+
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
     </style>
 </head>
 <body>
@@ -85,7 +108,7 @@
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
         // --- Mock Data & API Wrapper for Preview ---
         const isPreview = typeof google === 'undefined' || typeof google.script === 'undefined';
@@ -104,7 +127,6 @@
                         .apiGetData();
                 }
             },
-            // get user removed as it is now handled server-side for memo
             syncWbsProgress: (onSuccess, onFailure) => {
                 if (isPreview) {
                     // Mock data for preview
@@ -119,6 +141,17 @@
                     setTimeout(() => onSuccess({ projects: [...mockProjects] }), 1000);
                 } else {
                     google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiSyncWbsProgress();
+                }
+            },
+            // ★ Heartbeat Wrapper
+            heartbeat: (onSuccess, onFailure) => {
+                if (isPreview) {
+                    // Mock active users
+                    const users = ["自分", "金丸", "三輪"].filter(() => Math.random() > 0.3);
+                    if(!users.includes("自分")) users.push("自分");
+                    setTimeout(() => onSuccess({ activeUsers: users }), 500);
+                } else {
+                    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiHeartbeat();
                 }
             },
             createProject: (project, onSuccess, onFailure) => {
@@ -140,20 +173,28 @@
                     google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiUpdateProject(project);
                 }
             },
+            deleteProject: (projectId, onSuccess, onFailure) => {
+                if (isPreview) {
+                    const idx = mockProjects.findIndex(p => p.id === projectId);
+                    if(idx >= 0) mockProjects.splice(idx, 1);
+                    setTimeout(() => onSuccess({ projects: [...mockProjects] }), 500);
+                } else {
+                    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiDeleteProject(projectId);
+                }
+            },
             addMemo: (projectId, text, onSuccess, onFailure) => {
                 if (isPreview) {
                     const idx = mockProjects.findIndex(p => p.id === projectId);
                     if(idx >= 0) {
                          const now = new Date();
                          const timeStr = now.getFullYear() + "/" + ("0"+(now.getMonth()+1)).slice(-2) + "/" + ("0"+now.getDate()).slice(-2) + " " + ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2);
-                         const name = "demo"; // Mock user name
+                         const name = "demo"; 
                          const newEntry = `[${timeStr} ${name}]\n${text}`;
                          const old = mockProjects[idx].description || "";
                          mockProjects[idx].description = newEntry + "\n\n" + old;
                     }
                     setTimeout(() => onSuccess({ projects: [...mockProjects] }), 500);
                 } else {
-                     // No longer passing username from client
                      google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiAddMemo(projectId, text);
                 }
             },
@@ -161,7 +202,6 @@
                 if (isPreview) {
                      const idx = mockProjects.findIndex(p => p.id === projectId);
                      if (idx >= 0 && mockProjects[idx].description) {
-                         // Improved regex split for preview as well
                          const rawEntries = mockProjects[idx].description.split(/(?=\[\d{4}\/\d{2}\/\d{2} \d{2}:\d{2} )/g);
                          const targetIdx = rawEntries.findIndex(e => e.trim() === oldRaw.trim());
                          if (targetIdx !== -1) {
@@ -200,7 +240,7 @@
         };
 
         // --- Icons ---
-        const IconBase = ({ children, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>);
+        const IconBase = ({ children, className, style }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{children}</svg>);
         const PlusIcon = ({ className }) => (<IconBase className={className}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></IconBase>);
         const BriefcaseIcon = ({ className }) => (<IconBase className={className}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></IconBase>);
         const ArchiveIcon = ({ className }) => (<IconBase className={className}><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></IconBase>);
@@ -214,11 +254,14 @@
         const ClockIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></IconBase>);
         const XIcon = ({ className }) => (<IconBase className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></IconBase>);
         const UserIcon = ({ className }) => (<IconBase className={className}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></IconBase>);
-        const SettingsIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></IconBase>);
+        const SettingsIcon = ({ className }) => (<IconBase className={className}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></IconBase>);
         const SendIcon = ({ className }) => (<IconBase className={className}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></IconBase>);
         const TrashIcon = ({ className }) => (<IconBase className={className}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></IconBase>);
         const PencilIcon = ({ className }) => (<IconBase className={className}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></IconBase>);
         const SaveIcon = ({ className }) => (<IconBase className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></IconBase>);
+        const ChevronLeftIcon = ({ className, style }) => (<IconBase className={className} style={style}><polyline points="15 18 9 12 15 6"></polyline></IconBase>);
+        const ChevronRightIcon = ({ className, style }) => (<IconBase className={className} style={style}><polyline points="9 18 15 12 9 6"></polyline></IconBase>);
+        const CalendarIcon = ({ className }) => (<IconBase className={className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></IconBase>);
 
         // --- Constants ---
         const PROJECT_STATUS_OPTIONS = [
@@ -228,6 +271,9 @@
             "完了", "作業保留中", "VAO/MCS試験待ち", "VAO/MCS試験中", "出張中", "請求済"
         ];
 
+        // Member Options
+        const MEMBER_OPTIONS = ["金丸", "三輪", "大﨑", "齋藤"];
+
         const TARGET_TASKS = [
           { key: 'revInternal', name: '定義レビュー(社内)', shortName: '社内レビュー' },
           { key: 'revMurasys',  name: '定義レビュー(ムラシス)', shortName: 'ムラシスレビュー' },
@@ -236,6 +282,559 @@
           { key: 'testSystem',  name: 'システム検証', shortName: 'システム検証' },
           { key: 'test3rd',     name: '第三者検証', shortName: '第三者検証' }
         ];
+
+        const WDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+        
+        // Dynamic Row Height Calculation
+        const getRowHeight = (project) => {
+            let members = [];
+            try { members = JSON.parse(project.memberSchedules || '[]'); } catch(e){}
+            const memberCount = Math.max(members.length, 1);
+            
+            // Base height + (member lines) + padding
+            // Card info height estimate: ~180px min for new layout
+            // Member list height estimate: 32px per member row, 20px padding
+            
+            const cardMinHeight = 180;
+            const membersHeight = (memberCount * 32) + 40; 
+            
+            return Math.max(cardMinHeight, membersHeight);
+        };
+
+        // --- Utility Functions ---
+        const formatProgress = (val) => {
+            if (val === undefined || val === '' || val === null) return '0%';
+            if (typeof val === 'number') return Math.round(val * 100) + '%';
+            if (typeof val === 'string') {
+                if (val.includes('%')) return val;
+                const num = parseFloat(val);
+                if (!isNaN(num)) {
+                    if (num <= 1 && num > 0) return Math.round(num * 100) + '%';
+                    return Math.round(num) + '%';
+                }
+            }
+            return val;
+        };
+
+        const formatCost = (val, decimals) => {
+            if (val === undefined || val === '' || val === null) return '-';
+            const num = parseFloat(val);
+            if (isNaN(num)) return val;
+            return num.toFixed(decimals);
+        };
+        
+        const formatDateShort = (dateStr) => {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr;
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        };
+
+        // Date Helper to avoid UTC issues and ensure Local Time 00:00:00
+        const createLocalDate = (dateStr) => {
+            if (!dateStr) return null;
+            if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [y, m, d] = dateStr.split('-').map(Number);
+                return new Date(y, m - 1, d);
+            }
+            const d = new Date(dateStr);
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        };
+
+        // --- Components ---
+        
+        // MultiSelect Component for PL/Worker
+        const MultiSelect = ({ label, options, value, onChange }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const selectedValues = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+            const toggleOption = (option) => {
+                let newValues;
+                if (selectedValues.includes(option)) {
+                    newValues = selectedValues.filter(v => v !== option);
+                } else {
+                    newValues = [...selectedValues, option];
+                }
+                // Sort by original options order to keep consistent display
+                const sorted = options.filter(o => newValues.includes(o));
+                onChange(sorted.join(', '));
+            };
+
+            return (
+                <div className="relative group">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{label}</label>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                        className={`w-full text-left text-xs font-bold bg-slate-50 border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 flex justify-between items-center min-h-[28px] ${isOpen ? 'ring-1 ring-brand-500 border-brand-500' : ''}`}
+                    >
+                        <span className="flex-1 leading-tight break-words">
+                            {selectedValues.length > 0 ? selectedValues.join(', ') : <span className="text-slate-400">未選択</span>}
+                        </span>
+                        <ChevronDownIcon className={`w-3 h-3 text-slate-500 ml-1 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isOpen && (
+                        <div className="w-full bg-white border border-slate-200 rounded-md shadow-sm mt-1 overflow-hidden z-10 relative">
+                            {options.map(opt => (
+                                <div 
+                                    key={opt} 
+                                    className="flex items-center px-2 py-1.5 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0"
+                                    onClick={(e) => { e.stopPropagation(); toggleOption(opt); }}
+                                >
+                                    <div className={`w-3 h-3 border rounded mr-2 flex items-center justify-center flex-shrink-0 transition-colors ${selectedValues.includes(opt) ? 'bg-brand-500 border-brand-500' : 'border-slate-300'}`}>
+                                        {/* Simple checkmark using SVG path directly or icon */}
+                                        {selectedValues.includes(opt) && (
+                                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <span className="text-xs text-slate-700">{opt}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {/* Background overlay to close when clicking outside */}
+                    {isOpen && (
+                        <div className="fixed inset-0 z-0 cursor-default" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}></div>
+                    )}
+                </div>
+            );
+        };
+
+        // Toast Notification
+        function ToastContainer({ toasts, removeToast }) {
+            return (
+                <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+                    {toasts.map(toast => (
+                        <div key={toast.id} className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-floating animate-slide-up-fade border ${
+                            toast.type === 'loading' ? 'bg-white border-brand-200 text-slate-700' :
+                            toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                            'bg-red-50 border-red-200 text-red-800'
+                        }`}>
+                            {toast.type === 'loading' && <RefreshIcon className="w-4 h-4 animate-spin text-brand-500" />}
+                            {toast.type === 'success' && <CheckCircleIcon className="w-4 h-4 text-emerald-600" />}
+                            {toast.type === 'error' && <XIcon className="w-4 h-4 text-red-600" />}
+                            <span className="text-sm font-bold">{toast.message}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // Active User Display Component
+        function ActiveUserIndicator({ activeUsers }) {
+            return (
+                <div className="flex items-center">
+                    <div className="flex -space-x-1.5 overflow-hidden mr-2">
+                        {activeUsers.map((u, i) => (
+                            <div key={i} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-600 shadow-sm" title={`${u}が閲覧中`}>
+                                {u.slice(0, 1)}
+                            </div>
+                        ))}
+                    </div>
+                    {activeUsers.length > 0 && <span className="text-xs text-slate-400 font-medium">{activeUsers.length}人</span>}
+                </div>
+            );
+        }
+
+        function SchedulePanel({ projects, showSchedule, onOpenCreateModal, onEditProject, onEditSchedule, activeUsers }) {
+            // Filter only trip projects
+            const activeProjects = useMemo(() => 
+                projects.filter(p => p.status !== 'completed' && p.type === 'trip'), 
+            [projects]);
+
+            // 1. Determine Timeline Range based on ALL active projects
+            const { startDate, endDate, daysArray } = useMemo(() => {
+                // Default range if no data
+                let minDate = new Date();
+                minDate.setDate(minDate.getDate() - 7);
+                let maxDate = new Date();
+                maxDate.setDate(maxDate.getDate() + 35); // 5 weeks
+
+                if (activeProjects.length > 0) {
+                    const dates = [];
+                    activeProjects.forEach(p => {
+                        let members = [];
+                        try {
+                            if (p.memberSchedules) members = JSON.parse(p.memberSchedules);
+                        } catch(e){}
+                        
+                        if (Array.isArray(members)) {
+                            members.forEach(m => {
+                                const sd = createLocalDate(m.startDate);
+                                const ed = createLocalDate(m.endDate);
+                                if(sd) dates.push(sd);
+                                if(ed) dates.push(ed);
+                            });
+                        }
+                        const psd = createLocalDate(p.startDate);
+                        const ped = createLocalDate(p.endDate);
+                        if(psd) dates.push(psd);
+                        if(ped) dates.push(ped);
+                    });
+
+                    if (dates.length > 0) {
+                        const pMin = new Date(Math.min(...dates));
+                        const pMax = new Date(Math.max(...dates));
+                        
+                        // Add buffer
+                        minDate = new Date(pMin);
+                        minDate.setDate(minDate.getDate() - 7);
+                        
+                        maxDate = new Date(pMax);
+                        maxDate.setDate(maxDate.getDate() + 7);
+                        
+                        // Ensure at least 1 month width
+                        const diff = (maxDate - minDate) / (1000 * 60 * 60 * 24);
+                        if (diff < 30) {
+                            maxDate.setDate(maxDate.getDate() + (30 - diff));
+                        }
+                    }
+                }
+
+                // Normalize to start of day
+                minDate.setHours(0,0,0,0);
+                maxDate.setHours(0,0,0,0);
+
+                // Generate days array
+                const days = [];
+                const curr = new Date(minDate);
+                while (curr <= maxDate) {
+                    days.push(new Date(curr));
+                    curr.setDate(curr.getDate() + 1);
+                }
+
+                return { startDate: minDate, endDate: maxDate, daysArray: days };
+            }, [activeProjects]);
+
+            // Month Headers
+            const monthHeaders = useMemo(() => {
+                const headers = [];
+                let currentMonth = '';
+                let count = 0;
+                
+                daysArray.forEach(d => {
+                    const mStr = `${d.getFullYear()}/${d.getMonth() + 1}`;
+                    if (mStr !== currentMonth) {
+                        if (currentMonth) {
+                            headers.push({ name: currentMonth, count: count });
+                        }
+                        currentMonth = mStr;
+                        count = 1;
+                    } else {
+                        count++;
+                    }
+                });
+                if (currentMonth) headers.push({ name: currentMonth, count: count });
+                return headers;
+            }, [daysArray]);
+
+            const CELL_WIDTH = 40; 
+            const TOTAL_WIDTH = daysArray.length * CELL_WIDTH;
+            
+            // Refs for Sync Scroll
+            const leftPanelRef = useRef(null);
+            const rightPanelRef = useRef(null);
+            const headerRef = useRef(null);
+
+            const handleLeftScroll = (e) => {
+                if (rightPanelRef.current) {
+                    rightPanelRef.current.scrollTop = e.target.scrollTop;
+                }
+            };
+
+            const handleRightScroll = (e) => {
+                if (leftPanelRef.current) {
+                    leftPanelRef.current.scrollTop = e.target.scrollTop;
+                }
+            };
+
+            // Auto-Scroll to Today (Only once on mount/show)
+            useEffect(() => {
+                if (showSchedule && rightPanelRef.current) {
+                    const now = new Date();
+                    const diffTime = now - startDate;
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays >= 0) {
+                        const targetX = diffDays * CELL_WIDTH;
+                        rightPanelRef.current.scrollTo({
+                            left: targetX - 100, // Offset for context
+                            behavior: 'auto'
+                        });
+                    }
+                }
+            }, [showSchedule, startDate]);
+
+            const getPosition = (dateStr) => {
+                const d = createLocalDate(dateStr);
+                if (!d) return null;
+                const diffTime = d - startDate;
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays * CELL_WIDTH;
+            };
+
+            const getDuration = (startStr, endStr) => {
+                const s = createLocalDate(startStr);
+                const e = createLocalDate(endStr);
+                if (!s || !e) return 0;
+                const diffTime = e - s;
+                // Add 1 day because date range is inclusive
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                return Math.max(diffDays, 1) * CELL_WIDTH;
+            };
+
+            return (
+                <div className="h-full flex flex-col bg-slate-50 overflow-hidden w-full relative font-sans">
+                    {/* Header */}
+                    <div className="p-5 border-b border-slate-200 bg-white/80 backdrop-blur flex justify-between items-center flex-shrink-0 z-20 shadow-sm">
+                        <h2 className="text-xl font-bold text-slate-800 flex items-center tracking-tight gap-4">
+                            <span className="flex items-center"><MapPinIcon className="w-6 h-6 mr-2 text-brand-600"/>現地出張スケジュール</span>
+                            {/* Active Users on Schedule Panel */}
+                            <ActiveUserIndicator activeUsers={activeUsers} />
+                        </h2>
+                        <button 
+                            onClick={() => onOpenCreateModal()} 
+                            className="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-full hover:bg-brand-700 transition shadow-lg hover:shadow-xl font-bold text-sm"
+                        >
+                            <PlusIcon className="w-4 h-4 mr-1.5"/> 出張を追加
+                        </button>
+                    </div>
+
+                    {/* Main Content: 2-Column Split View */}
+                    <div className="flex-1 flex overflow-hidden bg-white">
+                        
+                        {/* Left Column: Project Info List */}
+                        <div 
+                            ref={leftPanelRef}
+                            onScroll={handleLeftScroll}
+                            className="w-[480px] flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar flex flex-col z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]"
+                        >
+                            <div className="sticky top-0 z-20 bg-slate-50 border-b border-slate-200 h-14 flex items-center px-4 text-sm font-bold text-slate-500 uppercase tracking-wider">
+                                <div className="w-2/3">Project Info</div>
+                                <div className="w-1/3 pl-2">Members</div>
+                            </div>
+                            
+                            <div className="pb-10">
+                                {activeProjects.length === 0 && (
+                                    <div className="text-center py-20 text-slate-400 text-sm">出張予定はありません</div>
+                                )}
+                                {activeProjects.map(project => {
+                                    let members = [];
+                                    try { members = JSON.parse(project.memberSchedules || '[]'); } catch(e){}
+                                    const rowHeight = getRowHeight(project);
+                                    
+                                    return (
+                                        <div 
+                                            key={project.id}
+                                            className="border-b border-slate-100 group hover:bg-slate-50 transition-colors flex items-stretch"
+                                            style={{ height: rowHeight }}
+                                            onClick={() => onEditProject(project)}
+                                        >
+                                            {/* Project Info Section */}
+                                            <div className="w-2/3 p-4 flex flex-col justify-between border-r border-slate-50 cursor-pointer">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        {project.siteName && (
+                                                            <div className="inline-block px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 text-xs font-bold truncate max-w-full">
+                                                                {project.siteName}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <h3 className="text-base font-bold leading-snug text-slate-700 line-clamp-2 mb-2" title={project.name}>
+                                                        {project.name}
+                                                    </h3>
+                                                    <div className="flex flex-col gap-1 text-xs text-slate-500 font-mono">
+                                                        {(project.pwbs || project.sakuban) && (
+                                                            <div className="flex items-center">
+                                                                <span className="w-16 text-slate-400">PWBS-作番:</span>
+                                                                <span className="font-bold">{project.pwbs || '-'}{project.sakuban ? `-${project.sakuban}` : ''}</span>
+                                                            </div>
+                                                        )}
+                                                        {project.estimateNo && (
+                                                            <div className="flex items-center">
+                                                                <span className="w-16 text-slate-400">見積No:</span>
+                                                                <span className="font-bold">{project.estimateNo}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center text-xs font-mono text-slate-400 mt-2 pt-2 border-t border-slate-100/50">
+                                                    <CalendarIcon className="w-3.5 h-3.5 mr-1.5"/>
+                                                    <span>{formatDateShort(project.startDate)} - {formatDateShort(project.endDate)}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Members Section (Right side of card) */}
+                                            <div className="w-1/3 p-3 bg-slate-50/30 flex flex-col justify-center">
+                                                <div className="space-y-2 w-full">
+                                                    {members.map((m, idx) => (
+                                                        <div key={idx} className="flex items-center text-sm text-slate-700 bg-white border border-slate-100 rounded px-2 py-1 shadow-sm h-8">
+                                                            <UserIcon className="w-3.5 h-3.5 mr-1.5 text-slate-400 flex-shrink-0"/>
+                                                            <span className="truncate font-bold flex-1">{m.name}</span>
+                                                        </div>
+                                                    ))}
+                                                    {members.length === 0 && <span className="text-xs text-slate-300 italic pl-1">未定</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Right Column: Timeline */}
+                        <div className="flex-1 flex flex-col bg-white min-w-0 overflow-hidden">
+                            <div 
+                                ref={rightPanelRef}
+                                onScroll={handleRightScroll}
+                                className="flex-1 overflow-auto custom-scrollbar relative"
+                            >
+                                <div style={{ width: TOTAL_WIDTH }} className="relative bg-white min-h-full">
+                                    {/* Sticky Header: Dates */}
+                                    <div ref={headerRef} className="sticky top-0 z-30 shadow-sm bg-white/95 backdrop-blur border-b border-slate-200">
+                                        <div className="flex h-6 border-b border-slate-100 bg-slate-50/50">
+                                            {monthHeaders.map((m, i) => (
+                                                <div key={i} className="flex items-center px-2 text-xs font-bold text-slate-500 border-r border-slate-200/50 uppercase tracking-wider" style={{ width: m.count * CELL_WIDTH }}>
+                                                    {m.name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex h-8">
+                                            {daysArray.map((d, i) => {
+                                                const isSat = d.getDay() === 6;
+                                                const isSun = d.getDay() === 0;
+                                                const bg = isSat ? 'bg-blue-50/40' : isSun ? 'bg-red-50/40' : 'bg-transparent';
+                                                const text = isSat ? 'text-blue-500' : isSun ? 'text-red-500' : 'text-slate-400';
+                                                
+                                                return (
+                                                    <div key={i} className={`flex-shrink-0 border-r border-slate-100 flex flex-col items-center justify-center ${bg}`} style={{ width: CELL_WIDTH }}>
+                                                        <span className={`text-xs font-bold ${text}`}>{d.getDate()}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Body: Rows & Bars */}
+                                    <div>
+                                        {activeProjects.map((project) => {
+                                            let members = [];
+                                            try { members = JSON.parse(project.memberSchedules || '[]'); } catch(e){}
+                                            
+                                            const rowHeight = getRowHeight(project);
+                                            const barHeight = 24; // Fixed height for bars in this layout
+                                            const barSpacing = 8; // Spacing between bars
+
+                                            return (
+                                                <div 
+                                                    key={project.id} 
+                                                    className="border-b border-slate-50 relative group transition hover:bg-slate-50/30" 
+                                                    style={{ height: rowHeight }}
+                                                >
+                                                    {/* Grid Lines */}
+                                                    <div className="absolute inset-0 flex pointer-events-none">
+                                                        {daysArray.map((d, i) => {
+                                                            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                                            return <div key={i} className={`flex-shrink-0 border-r border-slate-100 h-full ${isWeekend ? 'bg-slate-50/30' : ''}`} style={{ width: CELL_WIDTH }}></div>;
+                                                        })}
+                                                    </div>
+
+                                                    {/* Bars Container */}
+                                                    <div className="absolute inset-0 flex flex-col justify-center px-0 pointer-events-none p-3 space-y-2">
+                                                        {members.map((m, mIdx) => {
+                                                            const left = getPosition(m.startDate);
+                                                            const width = getDuration(m.startDate, m.endDate);
+                                                            
+                                                            if (left === null || width === 0) return (
+                                                                <div key={mIdx} className="relative w-full h-8"></div>
+                                                            );
+
+                                                            return (
+                                                                <div key={mIdx} className="relative w-full h-8 flex items-center">
+                                                                    <div 
+                                                                        className="absolute h-6 rounded-md bg-gradient-to-r from-accent-500 to-accent-600 shadow-sm border border-accent-600/20 cursor-pointer pointer-events-auto hover:brightness-110 flex items-center overflow-hidden transition-all hover:scale-[1.01]"
+                                                                        style={{ left: left, width: width }}
+                                                                        onClick={() => onEditSchedule({
+                                                                            originalProject: project,
+                                                                            memberIndex: mIdx,
+                                                                            name: m.name,
+                                                                            startDate: m.startDate,
+                                                                            endDate: m.endDate
+                                                                        })}
+                                                                        title={`${m.name} (${m.startDate} ~ ${m.endDate})`}
+                                                                    >
+                                                                        {/* Travel Indicators */}
+                                                                        <div className="absolute left-0 top-0 bottom-0 bg-orange-400/90 z-10 flex items-center justify-center" style={{ width: CELL_WIDTH }}>
+                                                                            {barHeight >= 12 && <span className="text-[9px] text-white font-bold scale-90">移動</span>}
+                                                                        </div>
+                                                                        {width > CELL_WIDTH && (
+                                                                            <div className="absolute right-0 top-0 bottom-0 bg-orange-400/90 z-10 flex items-center justify-center" style={{ width: CELL_WIDTH }}>
+                                                                                <span className="text-[9px] text-white font-bold scale-90">移動</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {members.length === 0 && (
+                                                            // Fallback if no members but dates exist on project
+                                                            (() => {
+                                                                const left = getPosition(project.startDate);
+                                                                const width = getDuration(project.startDate, project.endDate);
+                                                                if (left !== null && width > 0) {
+                                                                    return (
+                                                                        <div className="relative w-full h-8 flex items-center">
+                                                                            <div 
+                                                                                className="absolute h-6 rounded-md bg-slate-300/50 border border-slate-300 pointer-events-auto cursor-pointer"
+                                                                                style={{ left, width }}
+                                                                                onClick={() => onEditProject(project)}
+                                                                                title="メンバー未定"
+                                                                            ></div>
+                                                                        </div>
+                                                                    )
+                                                                }
+                                                                return null;
+                                                            })()
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Today Marker */}
+                                    {(() => {
+                                        const now = new Date();
+                                        // Use normalized Local Date for marker
+                                        const left = getPosition(now.getFullYear() + "-" + (now.getMonth() + 1) + "-" + now.getDate());
+                                        if (left !== null && left >= 0 && left <= TOTAL_WIDTH) {
+                                            return (
+                                                <div className="absolute top-8 bottom-0 w-px bg-red-500 z-10 pointer-events-none" style={{ left: left + (CELL_WIDTH/2) }}>
+                                                    <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 -mt-1 shadow-sm"></div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    
+                    {/* Footer Legend */}
+                    <div className="p-3 text-sm text-slate-400 bg-white border-t border-slate-200 text-right flex justify-between items-center px-6 z-20">
+                         <div className="flex items-center gap-4">
+                             <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-orange-400 rounded-full"></div><span className="text-xs font-medium">移動日</span></div>
+                             <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-accent-500 rounded-full"></div><span className="text-xs font-medium">現地作業</span></div>
+                        </div>
+                        <span className="font-medium opacity-60">左右にドラッグしてスクロール</span>
+                    </div>
+                </div>
+            );
+        }
 
         // --- Sub-Component: Memo Section ---
         function MemoSection({ project, onUpdateData }) {
@@ -337,12 +936,15 @@
 
             return (
                 <div className="mb-4">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">プロジェクトログ</label>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">プロジェクトログ</label>
                     
                     {/* Stylish Log Display */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 h-48 overflow-y-auto custom-scrollbar space-y-3">
+                    {/* Added 'overscroll-y-contain' to prevent scroll chaining.
+                        This ensures scrolling inside this container doesn't scroll the parent page.
+                    */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 h-48 overflow-y-auto overscroll-y-contain custom-scrollbar space-y-3">
                         {parsedMemos.length === 0 ? (
-                            <div className="text-center text-slate-400 text-xs py-4 italic">No logs recorded</div>
+                            <div className="text-center text-slate-400 text-sm py-4 italic">No logs recorded</div>
                         ) : (
                             parsedMemos.map((m, idx) => (
                                 <div key={idx} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm group">
@@ -374,7 +976,7 @@
                                                         <span className="font-bold text-xs text-slate-700 truncate">
                                                             {m.name.split('@')[0]}
                                                         </span>
-                                                        <span className="text-[10px] text-slate-400 font-mono flex-shrink-0 ml-auto">{m.date}</span>
+                                                        <span className="text-xs text-slate-400 font-mono flex-shrink-0 ml-auto">{m.date}</span>
                                                     </div>
                                                     
                                                     <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -413,9 +1015,9 @@
                                                         onClick={() => handleDelete(m.raw)}
                                                         className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition"
                                                         title="削除"
-                                                    >
-                                                        <TrashIcon className="w-3 h-3" />
-                                                    </button>
+                                                        >
+                                                            <TrashIcon className="w-3 h-3" />
+                                                        </button>
                                                 </div>
                                             </div>
                                         )
@@ -450,21 +1052,86 @@
 
         // --- Main App Component ---
         function App() {
-            const [projects, setProjects] = useState([]);
-            const [loading, setLoading] = useState(true);
+            // Local Storage Key
+            const CACHE_KEY = 'mm_projects_v1';
+
+            // Initialize from Cache
+            const [projects, setProjects] = useState(() => {
+                try {
+                    const cached = localStorage.getItem(CACHE_KEY);
+                    return cached ? JSON.parse(cached) : [];
+                } catch(e) {
+                    return [];
+                }
+            });
+            
+            // Only show loading if cache is empty
+            const [loading, setLoading] = useState(() => {
+                return !localStorage.getItem(CACHE_KEY);
+            });
+
+            // ★ Heartbeat: Active Users State
+            const [activeUsers, setActiveUsers] = useState([]);
+
             const [expandedProjectIds, setExpandedProjectIds] = useState(new Set());
             const [tab, setTab] = useState('active');
-            const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+            
+            // Modal State: null | 'project' | 'trip'
+            const [activeModal, setActiveModal] = useState(null);
+            
+            // Form State
             const [projectForm, setProjectForm] = useState({ 
-                name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '', skipWbs: false
+                name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '', skipWbs: false,
+                startDate: '', endDate: '', memberSchedules: [{ name: '', startDate: '', endDate: '' }] // Always initialize with one empty member for trips
             });
+
             const [syncing, setSyncing] = useState(false);
             const [activeWbsUrl, setActiveWbsUrl] = useState(null);
             
-            // Project Settings Modal State
+            // New State for Schedule Panel
+            const [showSchedule, setShowSchedule] = useState(false);
+            
+            // Project Settings Modal State (Left side)
             const [editingProject, setEditingProject] = useState(null);
+            
+            // Single Schedule Edit State (Right side)
+            const [editingSchedule, setEditingSchedule] = useState(null); // { project, memberIndex, data }
+
+            // Edit Form State (separate to allow canceling)
+            const [editForm, setEditForm] = useState(null);
 
             const isSaving = useRef(false);
+            
+            // Toast State
+            const [toasts, setToasts] = useState([]);
+
+            const addToast = (message, type = 'info') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, message, type }]);
+                // Auto remove success/error after 3 seconds
+                if (type !== 'loading') {
+                    setTimeout(() => removeToast(id), 3000);
+                }
+                return id;
+            };
+
+            const removeToast = (id) => {
+                setToasts(prev => prev.filter(t => t.id !== id));
+            };
+
+            const updateToast = (id, message, type) => {
+                setToasts(prev => prev.map(t => t.id === id ? { ...t, message, type } : t));
+                if (type !== 'loading') {
+                    setTimeout(() => removeToast(id), 3000);
+                }
+            };
+
+            // Persist to Cache whenever projects change
+            useEffect(() => {
+                if (projects.length > 0) {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify(projects));
+                }
+            }, [projects]);
 
             // Fetch Data
             const fetchData = useCallback(() => {
@@ -472,7 +1139,14 @@
                 backend.getData(
                     (data) => {
                         if (isSaving.current) return;
-                        setProjects(prev => JSON.stringify(prev) !== JSON.stringify(data.projects) ? (data.projects || []) : prev);
+                        setProjects(prev => {
+                            // Only update if data is different (simple stringify check)
+                            const newData = data.projects || [];
+                            if (JSON.stringify(prev) !== JSON.stringify(newData)) {
+                                return newData;
+                            }
+                            return prev;
+                        });
                         setLoading(false);
                     },
                     (err) => console.error("Fetch error:", err)
@@ -480,17 +1154,31 @@
             }, []);
 
             // Sync WBS
-            const handleSyncWbs = useCallback(() => {
+            const handleSyncWbs = useCallback((isSilent = false) => {
                 if(syncing) return;
                 setSyncing(true);
+                
+                let toastId = null;
+                if (!isSilent) {
+                    toastId = addToast('WBS同期中...', 'loading');
+                }
+                
                 backend.syncWbsProgress(
                     (data) => {
                         setProjects(data.projects || []);
                         setSyncing(false);
+                        if (!isSilent && toastId) {
+                            updateToast(toastId, '同期完了', 'success');
+                        }
                     },
                     (err) => {
                         console.error("Sync error:", err);
                         setSyncing(false);
+                        if (toastId) {
+                            updateToast(toastId, '同期エラー', 'error');
+                        } else if (isSilent) {
+                            addToast('自動同期エラー', 'error');
+                        }
                     }
                 );
             }, [syncing]);
@@ -498,17 +1186,43 @@
             useEffect(() => {
                 fetchData();
                 const interval = setInterval(fetchData, 8000); 
+                
+                // Initial Sync (silent)
                 const initialSyncTimer = setTimeout(() => {
                     if (!isSaving.current) {
-                        console.log("Auto-syncing WBS progress...");
-                        handleSyncWbs();
+                        console.log("Initial auto-sync WBS...");
+                        handleSyncWbs(true); // Silent
                     }
                 }, 2000); 
+
+                // Auto Sync WBS every 60 seconds (silent)
+                const autoSyncInterval = setInterval(() => {
+                    if (!isSaving.current && !document.hidden) {
+                        console.log("Regular auto-sync WBS...");
+                        handleSyncWbs(true); // Silent
+                    }
+                }, 60000);
+                
+                // ★ Heartbeat Loop (Every 60s)
+                const sendHeartbeat = () => {
+                    backend.heartbeat(
+                        (data) => {
+                            setActiveUsers(data.activeUsers || []);
+                        },
+                        (err) => console.error("Heartbeat fail", err)
+                    );
+                };
+                
+                sendHeartbeat(); // Initial call
+                const hbInterval = setInterval(sendHeartbeat, 60000);
+
                 return () => {
                     clearInterval(interval);
                     clearTimeout(initialSyncTimer);
+                    clearInterval(autoSyncInterval);
+                    clearInterval(hbInterval); // ★Clear heartbeat
                 };
-            }, []); 
+            }, [handleSyncWbs]); 
 
             const handleUpdateData = (newData) => {
                 setProjects(newData.projects || []);
@@ -537,9 +1251,34 @@
 
             const handleCreateProject = (e) => {
                 e.preventDefault();
-                setLoading(true);
+                // 非同期登録のためにloadingステートはセットしない
                 isSaving.current = true;
                 
+                const isTrip = activeModal === 'trip';
+                const toastId = addToast(isTrip ? '出張予定を登録中...' : 'プロジェクトを作成中...', 'loading');
+                
+                // For trip, calculate total start/end from members
+                let calculatedStart = projectForm.startDate;
+                let calculatedEnd = projectForm.endDate;
+                
+                if (isTrip) {
+                    const validMembers = (projectForm.memberSchedules || []).filter(m => m.startDate && m.endDate);
+                    if (validMembers.length === 0) {
+                        setLoading(false);
+                        isSaving.current = false;
+                        removeToast(toastId);
+                        alert("少なくとも1人のメンバーに期間を設定してください。");
+                        return;
+                    }
+                    const starts = validMembers.map(m => new Date(m.startDate).getTime());
+                    const ends = validMembers.map(m => new Date(m.endDate).getTime());
+                    const minTime = Math.min(...starts);
+                    const maxTime = Math.max(...ends);
+                    
+                    if(!isNaN(minTime)) calculatedStart = new Date(minTime).toISOString().split('T')[0];
+                    if(!isNaN(maxTime)) calculatedEnd = new Date(maxTime).toISOString().split('T')[0];
+                }
+
                 const cleanData = {
                     name: (projectForm.name || '').toString(),
                     siteName: (projectForm.siteName || '').toString(),
@@ -548,26 +1287,31 @@
                     sakuban: (projectForm.sakuban || '').toString(),
                     estimateNo: (projectForm.estimateNo || '').toString(),
                     deadline: (projectForm.deadline || '').toString(),
-                    description: (projectForm.description || '').toString(),
-                    skipWbs: projectForm.skipWbs || false,
+                    description: '', // description removed from form
+                    startDate: (calculatedStart || '').toString(),
+                    endDate: (calculatedEnd || '').toString(),
+                    skipWbs: isTrip ? true : (projectForm.skipWbs || false), // Trips always skip WBS
+                    type: isTrip ? 'trip' : 'normal',
                     status: 'active',
-                    projectStatus: "資料受領待ち"
+                    projectStatus: isTrip ? '出張中' : "資料受領待ち",
+                    // Serialize complex objects for GAS
+                    memberSchedules: JSON.stringify(projectForm.memberSchedules || [])
                 };
+
+                // Optimistic UI Update: Close modal immediately
+                setActiveModal(null);
+                setProjectForm({ name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '', skipWbs: false, startDate: '', endDate: '', memberSchedules: [{name: '', startDate: '', endDate: ''}] }); 
 
                 backend.createProject(
                     cleanData,
                     (data) => { 
                         isSaving.current = false;
                         handleUpdateData(data); 
-                        setLoading(false); 
-                        setIsProjectModalOpen(false); 
-                        setProjectForm({ name: '', siteName: '', code: '', pwbs: '', sakuban: '', estimateNo: '', deadline: '', description: '', skipWbs: false }); 
-                        alert("プロジェクトを作成しました。");
+                        updateToast(toastId, '登録完了', 'success');
                     },
                     (err) => { 
                         isSaving.current = false;
-                        alert("作成エラー: " + err); 
-                        setLoading(false); 
+                        updateToast(toastId, '作成エラー: ' + err, 'error');
                     }
                 );
             };
@@ -577,35 +1321,204 @@
                 if (!p) return;
                 const updated = { ...p, ...data };
                 setProjects(projects.map(prj => prj.id === id ? updated : prj));
+                
                 isSaving.current = true;
+                const toastId = addToast('保存中...', 'loading');
+                
                 backend.updateProject(updated, 
                     (resData) => {
                         isSaving.current = false;
                         handleUpdateData(resData);
+                        updateToast(toastId, '保存完了', 'success');
                     }, 
                     (err) => {
                         isSaving.current = false;
                         console.error(err);
+                        updateToast(toastId, '保存エラー', 'error');
+                    }
+                );
+            };
+
+            const handleDeleteProject = (id) => {
+                if(!confirm("本当にこの予定を削除しますか？\n（復元できません）")) return;
+                
+                isSaving.current = true;
+                const toastId = addToast('削除中...', 'loading');
+                
+                backend.deleteProject(id,
+                    (data) => {
+                        isSaving.current = false;
+                        handleUpdateData(data);
+                        setEditingProject(null);
+                        setEditForm(null);
+                        updateToast(toastId, '削除完了', 'success');
+                    },
+                    (err) => {
+                        isSaving.current = false;
+                        updateToast(toastId, '削除エラー: ' + err, 'error');
                     }
                 );
             };
             
-            // Handler for settings modal save
+            // Helper for edit form state initialization (Project Settings)
+            const openEditModal = (project) => {
+                let members = [];
+                try {
+                    members = typeof project.memberSchedules === 'string' 
+                        ? JSON.parse(project.memberSchedules) 
+                        : (project.memberSchedules || []);
+                } catch(e) {}
+
+                setEditForm({
+                    ...project,
+                    memberSchedules: Array.isArray(members) ? members : []
+                });
+                setEditingProject(project);
+            };
+
+            // Helper for single schedule edit (Bar Click)
+            const handleEditSchedule = (row) => {
+                setEditingSchedule({
+                    project: row.originalProject,
+                    memberIndex: row.memberIndex, // undefined if main project
+                    data: {
+                        name: row.name,
+                        startDate: row.startDate,
+                        endDate: row.endDate
+                    }
+                });
+            };
+
+            const handleSaveScheduleUpdate = (e) => {
+                e.preventDefault();
+                const { project, memberIndex, data } = editingSchedule;
+                
+                if (memberIndex !== undefined) {
+                    // Update specific member
+                    let members = [];
+                    try {
+                        members = typeof project.memberSchedules === 'string' ? JSON.parse(project.memberSchedules) : project.memberSchedules;
+                    } catch(e) {}
+                    
+                    if (Array.isArray(members) && members[memberIndex]) {
+                        members[memberIndex] = { ...members[memberIndex], name: data.name, startDate: data.startDate, endDate: data.endDate };
+                        
+                        // Recalculate project total duration
+                        const starts = members.map(m => new Date(m.startDate).getTime()).filter(t => !isNaN(t));
+                        const ends = members.map(m => new Date(m.endDate).getTime()).filter(t => !isNaN(t));
+                        
+                        let updates = { memberSchedules: JSON.stringify(members) };
+                        if (starts.length > 0) updates.startDate = new Date(Math.min(...starts)).toISOString().split('T')[0];
+                        if (ends.length > 0) updates.endDate = new Date(Math.max(...ends)).toISOString().split('T')[0];
+
+                        handleUpdateProject(project.id, updates);
+                    }
+                } else {
+                    // Update project itself (dates only)
+                    handleUpdateProject(project.id, { startDate: data.startDate, endDate: data.endDate });
+                }
+                setEditingSchedule(null);
+            };
+            
+            const handleDeleteSchedule = () => {
+                if(!confirm("この予定を削除しますか？")) return;
+                const { project, memberIndex } = editingSchedule;
+                
+                if (memberIndex !== undefined) {
+                    // Remove specific member
+                    let members = [];
+                    try {
+                        members = typeof project.memberSchedules === 'string' ? JSON.parse(project.memberSchedules) : project.memberSchedules;
+                    } catch(e) {}
+                    
+                    if (Array.isArray(members)) {
+                        members.splice(memberIndex, 1);
+                        
+                        // If no members left, maybe delete project? No, let's keep empty project for now or just update dates
+                         // Recalculate project total duration
+                        const starts = members.map(m => new Date(m.startDate).getTime()).filter(t => !isNaN(t));
+                        const ends = members.map(m => new Date(m.endDate).getTime()).filter(t => !isNaN(t));
+                        
+                        let updates = { memberSchedules: JSON.stringify(members) };
+                        if (starts.length > 0) {
+                            updates.startDate = new Date(Math.min(...starts)).toISOString().split('T')[0];
+                            updates.endDate = new Date(Math.max(...ends)).toISOString().split('T')[0];
+                        }
+
+                        handleUpdateProject(project.id, updates);
+                    }
+                } else {
+                   // Cannot delete main project from here easily without confirmation, user should use 'Project Settings'
+                   alert("プロジェクト全体の削除は「詳細設定」から行ってください。");
+                   return;
+                }
+                setEditingSchedule(null);
+            };
+
+
             const handleSaveSettings = (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
+                
+                // Recalculate duration if it's a trip
+                let startDate = fd.get('startDate');
+                let endDate = fd.get('endDate');
+
+                if (editingProject.type === 'trip') {
+                     const members = editForm.memberSchedules || [];
+                     const starts = members.map(m => new Date(m.startDate).getTime()).filter(t => !isNaN(t));
+                     const ends = members.map(m => new Date(m.endDate).getTime()).filter(t => !isNaN(t));
+                     if (starts.length > 0) startDate = new Date(Math.min(...starts)).toISOString().split('T')[0];
+                     if (ends.length > 0) endDate = new Date(Math.max(...ends)).toISOString().split('T')[0];
+                }
+
                 const updates = {
-                   name: fd.get('name'), 
+                   name: fd.get('name') || editingProject.name, // Fallback if hidden
                    code: fd.get('code'),
                    pwbs: fd.get('pwbs'),
                    sakuban: fd.get('sakuban'),
                    estimateNo: fd.get('estimateNo'),
                    deadline: fd.get('deadline'),
                    siteName: fd.get('siteName'),
-                   wbsUrl: fd.get('wbsUrl')
+                   wbsUrl: fd.get('wbsUrl'),
+                   startDate: startDate,
+                   endDate: endDate,
+                   // Use state for complex member data
+                   memberSchedules: JSON.stringify(editForm.memberSchedules)
                 };
                 handleUpdateProject(editingProject.id, updates);
                 setEditingProject(null);
+                setEditForm(null);
+            };
+
+            // Form Helpers for Members
+            const addMemberToForm = (setter, currentForm) => {
+                // Determine default dates from current form context if available, otherwise blank
+                // For new trip registration, try to use the last member's date or today
+                let defaultStart = '';
+                let defaultEnd = '';
+                const ms = currentForm.memberSchedules || [];
+                if (ms.length > 0) {
+                    defaultStart = ms[ms.length-1].startDate;
+                    defaultEnd = ms[ms.length-1].endDate;
+                }
+
+                setter({
+                    ...currentForm,
+                    memberSchedules: [...(currentForm.memberSchedules || []), { name: '', startDate: defaultStart, endDate: defaultEnd }]
+                });
+            };
+
+            const updateMemberInForm = (setter, currentForm, idx, field, val) => {
+                const newMembers = [...currentForm.memberSchedules];
+                newMembers[idx] = { ...newMembers[idx], [field]: val };
+                setter({ ...currentForm, memberSchedules: newMembers });
+            };
+
+            const removeMemberFromForm = (setter, currentForm, idx) => {
+                const newMembers = [...currentForm.memberSchedules];
+                newMembers.splice(idx, 1);
+                setter({ ...currentForm, memberSchedules: newMembers });
             };
 
             const handleArchiveProject = (id) => {
@@ -619,163 +1532,99 @@
             const handleSmartPaste = (e) => {
                 const text = e.target.value;
                 if (!text) return;
-                const lines = text.trim().split('\n');
+                
+                const lines = text.trim().split(/\r?\n/);
                 if (lines.length === 0) return;
-                const cols = lines[0].split('\t');
                 
-                if (cols.length < 5) {
-                    alert("列数が不足しています。Excelから行全体をコピーしてください。");
-                    return;
-                }
+                const cols = lines[0].split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+                
+                if (cols.length < 2) return;
 
-                const estimateNo = cols[0] || '';
-                const content = cols[1] || ''; 
-                const siteNameRaw = cols[2] || '';
-                const siteCode = cols[3] || '';
+                let estimateNo = cols[0] || '';
+                let name = cols[1] || '';
+                let siteName = cols[2] || '';
                 
-                const siteNameParts = [siteNameRaw];
-                if (siteCode && !siteCode.includes('担当') && !siteCode.includes('CSPA4') && siteCode.trim() !== '') {
-                    siteNameParts.push(siteCode);
+                const col3 = cols[3] || '';
+                if (col3 && !col3.includes('担当') && !col3.includes('CSPA') && col3.length < 15) {
+                    siteName = siteName ? `${siteName} ${col3}` : col3;
                 }
-                const siteName = siteNameParts.join(' ').trim();
-                const name = content.trim();
 
                 let pwbs = '';
                 let sakuban = '';
-                let pjCode = '';
-                let deadlineRaw = '';
-
-                let lastIdx = cols.length - 1;
-                while (lastIdx > 4 && !cols[lastIdx].trim()) {
-                    lastIdx--;
-                }
-
-                if (cols[lastIdx] && (cols[lastIdx].includes('/') || cols[lastIdx].includes('-'))) {
-                    deadlineRaw = cols[lastIdx];
-                    pjCode = cols[lastIdx - 1] || '';
-                    let val1 = cols[lastIdx - 2] || '';
-                    let val2 = cols[lastIdx - 3] || '';
-                    
-                    if (/^\d{5}$/.test(val1) && /^[A-Z]\d{3}$/.test(val2)) {
-                        sakuban = val1;
-                        pwbs = val2;
-                    } else {
-                        pwbs = val1;
-                    }
-                } else {
-                    pjCode = cols[lastIdx] || '';
-                    let val1 = cols[lastIdx - 1] || '';
-                    let val2 = cols[lastIdx - 2] || '';
-                    
-                    if (/^\d{5}$/.test(val1) && /^[A-Z]\d{3}$/.test(val2)) {
-                        sakuban = val1;
-                        pwbs = val2;
-                    } else {
-                        pwbs = val1;
-                    }
-                }
-
-                if (!sakuban && pwbs) {
-                    if (pwbs.match(/^[A-Z]\d{3}\d{5}$/)) {
-                        sakuban = pwbs.slice(4);
-                        pwbs = pwbs.slice(0, 4);
-                    } else if (pwbs.match(/^[A-Z]\d{3}-\d{5}$/)) {
-                        const parts = pwbs.split('-');
-                        pwbs = parts[0];
-                        sakuban = parts[1];
-                    }
-                }
-
+                let code = '';
                 let deadline = '';
-                if (deadlineRaw) {
-                    const dateMatch = deadlineRaw.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-                    if (dateMatch) {
-                        deadline = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+
+                for (let i = 4; i < cols.length; i++) {
+                    const val = cols[i];
+                    if (!val) continue;
+
+                    if (!deadline && val.match(/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/)) {
+                        const m = val.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                        if (m) {
+                            deadline = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                        }
+                        continue;
+                    }
+
+                    if (!pwbs && val.match(/^[A-Z]\d{3}$/)) {
+                        pwbs = val;
+                        continue;
+                    }
+
+                    if (!sakuban && val.match(/^\d{5}$/)) {
+                        sakuban = val;
+                        continue;
+                    }
+
+                    if (!code && i === 6 && !val.match(/\d{4}[\/\-]/)) {
+                        code = val;
+                        continue;
                     }
                 }
 
-                setProjectForm({ 
-                    ...projectForm, 
-                    name, 
-                    siteName, 
-                    code: pjCode, 
+                setProjectForm(prev => ({
+                    ...prev,
+                    name,
+                    siteName,
+                    estimateNo,
                     pwbs,
                     sakuban,
-                    estimateNo, 
-                    deadline, 
-                    description: '' 
-                });
+                    code,
+                    deadline
+                }));
             };
 
             const getStatusBannerColor = (status) => {
                  const s = status || '';
                  switch (s) {
                     case "作業開始前": return 'bg-sky-300';
-                    
                     case "資料受領待ち":
                     case "社内レビュー待ち":
                     case "ムラシスレビュー待ち":
                     case "システム検証待ち":
                     case "第三者検証待ち":
-                    case "VAO/MCS試験待ち":
-                        return 'bg-amber-400';
-                    
+                    case "VAO/MCS試験待ち": return 'bg-amber-400';
                     case "成果物作成中": return 'bg-lime-400';
-                    
                     case "統合試験準備中": return 'bg-emerald-300';
                     case "統合試験中": return 'bg-emerald-600';
-                    
                     case "社内検証準備中": return 'bg-rose-300';
                     case "社内検証中": return 'bg-rose-500';
-                    
                     case "システム検証中":
-                    case "VAO/MCS試験中":
-                        return 'bg-purple-400';
-                    
+                    case "VAO/MCS試験中": return 'bg-purple-400';
                     case "第三者検証中": return 'bg-purple-700';
-                    
                     case "完了":
-                    case "請求済":
-                        return 'bg-blue-800';
-                    
+                    case "請求済": return 'bg-blue-800';
                     case "作業保留中": return 'bg-red-500';
-                    
                     default: return 'bg-brand-600';
                  }
             };
 
             const filteredProjects = projects.filter(p => {
+                const isNormal = !p.type || p.type === 'normal';
+                if (!isNormal) return false;
                 if (tab === 'active') return p.status !== 'completed';
                 return p.status === 'completed';
             });
-
-            const formatProgress = (val) => {
-                if (val === undefined || val === '' || val === null) return '0%';
-                if (typeof val === 'number') return Math.round(val * 100) + '%';
-                if (typeof val === 'string') {
-                    if (val.includes('%')) return val;
-                    const num = parseFloat(val);
-                    if (!isNaN(num)) {
-                        if (num <= 1 && num > 0) return Math.round(num * 100) + '%';
-                        return Math.round(num) + '%';
-                    }
-                }
-                return val;
-            };
-
-            const formatCost = (val, decimals) => {
-                if (val === undefined || val === '' || val === null) return '-';
-                const num = parseFloat(val);
-                if (isNaN(num)) return val;
-                return num.toFixed(decimals);
-            };
-            
-            const formatDateShort = (dateStr) => {
-                if (!dateStr) return '-';
-                const date = new Date(dateStr);
-                if (isNaN(date.getTime())) return dateStr;
-                return `${date.getMonth() + 1}/${date.getDate()}`;
-            };
 
             const renderProjectList = (isCompact) => {
                 if (loading) return <div className="text-center py-10 text-sm w-full">Loading...</div>;
@@ -785,7 +1634,6 @@
                     </div>
                 );
 
-                // Normal Mode (List Layout)
                 if (!isCompact) {
                     return (
                         <div className="space-y-4">
@@ -793,15 +1641,12 @@
                                 const isExpanded = expandedProjectIds.has(p.id);
                                 return (
                                     <div key={p.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-                                        {/* Header */}
                                         <div className="relative cursor-pointer" onClick={(e) => {
                                             if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea')) return;
                                             toggleExpand(p.id);
                                         }}>
                                             <div className={`h-2 w-full transition-colors duration-500 ${getStatusBannerColor(p.projectStatus)}`}></div>
                                             <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                                
-                                                {/* Left: Info */}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         {p.siteName && (
@@ -814,22 +1659,15 @@
                                                     </div>
                                                     <h3 className="text-xl font-bold text-slate-900 leading-tight truncate mb-1" title={p.name}>{p.name}</h3>
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 font-mono">
-                                                        {/* PJ Code Removed per request */}
                                                         {p.pwbs && <span className="flex items-center"><span className="text-slate-400 mr-1">PWBS-作番:</span>{p.pwbs}{p.sakuban ? `-${p.sakuban}` : ''}</span>}
                                                         {p.estimateNo && <span className="flex items-center"><span className="text-slate-400 mr-1">見積:</span>{p.estimateNo}</span>}
                                                     </div>
                                                 </div>
-
-                                                {/* Right: Cost, Progress, WBS Button, Expand */}
                                                 <div className="flex items-center gap-6 flex-shrink-0 self-end md:self-center">
-                                                    
-                                                    {/* Cost Info */}
                                                     <div className="text-right flex flex-col items-end text-sm font-mono text-slate-500">
                                                         <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manDays, 1)}</span>(人日)</div>
                                                         <div className="flex items-center"><span className="font-bold text-slate-700 mr-1 text-base">{formatCost(p.manMonths, 2)}</span>(人月)</div>
                                                     </div>
-
-                                                    {/* Progress */}
                                                     <div className="text-right flex flex-col items-end">
                                                         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1">
                                                             Progress
@@ -839,8 +1677,6 @@
                                                         </div>
                                                         <div className="text-4xl font-bold text-slate-700 leading-none">{formatProgress(p.wbsProgress)}</div>
                                                     </div>
-
-                                                    {/* Big WBS Button for WBS Mode */}
                                                     <button 
                                                         className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl border transition-all shadow-sm ${p.wbsUrl ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 hover:scale-105 cursor-pointer shadow-md' : 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'}`}
                                                         onClick={(e) => {
@@ -852,30 +1688,21 @@
                                                         <FileTextIcon className="w-8 h-8 mb-1" />
                                                         <span className="text-sm font-bold">WBS</span>
                                                     </button>
-
-                                                    {/* Expand Arrow */}
                                                     <button className="text-slate-400 p-2 hover:bg-slate-100 rounded-full transition-colors">
                                                         {isExpanded ? <ChevronUpIcon className="w-6 h-6"/> : <ChevronDownIcon className="w-6 h-6"/>}
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* Expanded Form */}
                                         {isExpanded && (
                                             <div className="border-t border-slate-100 bg-slate-50 p-4 cursor-default animate-expand-fade-in">
-                                                
-                                                {/* Top Row: Task Status Grid & Settings Button */}
                                                 <div className="flex flex-col lg:flex-row gap-4 mb-4">
-                                                    
-                                                    {/* Compact Task Status Grid - Moved to Top */}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex justify-between items-center mb-1">
                                                             <h4 className="text-[10px] font-bold text-slate-400 uppercase">工程進捗状況</h4>
                                                         </div>
                                                         <div className="flex items-center gap-2 overflow-x-auto p-2 custom-scrollbar">
                                                             {(() => {
-                                                                // アクティブ（次のタスク）を判定するロジック
                                                                 const activeTaskIndex = TARGET_TASKS.findIndex(task => {
                                                                     const kStatus = `task_${task.key}_status`;
                                                                     const kActual = `task_${task.key}_actual`;
@@ -883,8 +1710,6 @@
                                                                     const hasActual = p[kActual] && p[kActual] !== '';
                                                                     const isCompleted = status === '完了';
                                                                     const isExcluded = status === '作業不要';
-                                                                    
-                                                                    // 完了でも作業不要でもなく、実績日も入っていない最初のタスクがアクティブ
                                                                     return !isCompleted && !isExcluded && !hasActual;
                                                                 });
 
@@ -896,14 +1721,8 @@
                                                                     const status = p[kStatus] || '-';
                                                                     const isCompleted = status === '完了';
                                                                     const isExcluded = status === '作業不要';
-                                                                    
-                                                                    // Check if actual date exists (for graying out)
                                                                     const hasActual = p[kActual] && p[kActual] !== '';
-                                                                    
-                                                                    // グレーアウト判定 (実績あり、または作業不要)
                                                                     const isGrayedOut = hasActual || isExcluded;
-                                                                    
-                                                                    // アクティブ判定
                                                                     const isActive = index === activeTaskIndex;
 
                                                                     return (
@@ -942,25 +1761,37 @@
                                                             })()}
                                                         </div>
                                                     </div>
-
-                                                    {/* Settings Button - Moved next to tasks */}
-                                                    <div className="flex-shrink-0 pt-6">
+                                                    <div className="flex-shrink-0 pt-6 flex flex-col gap-3 w-32">
                                                         <button 
-                                                            onClick={() => setEditingProject(p)}
-                                                            className="flex items-center text-xs font-bold text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded shadow-sm hover:bg-slate-50 transition whitespace-nowrap"
+                                                            onClick={() => openEditModal(p)}
+                                                            className="w-full flex items-center justify-center text-xs font-bold text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded shadow-sm hover:bg-slate-50 transition whitespace-nowrap"
                                                         >
                                                             <SettingsIcon className="w-4 h-4 mr-1.5" /> PJ詳細
                                                         </button>
+
+                                                        {/* PL & Worker Assignment */}
+                                                        <div className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-sm">
+                                                            <div className="mb-2">
+                                                                <MultiSelect 
+                                                                    label="PL (リーダー)"
+                                                                    options={MEMBER_OPTIONS}
+                                                                    value={p.pl || ''}
+                                                                    onChange={(val) => handleUpdateProject(p.id, { pl: val })}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <MultiSelect 
+                                                                    label="作業者"
+                                                                    options={MEMBER_OPTIONS}
+                                                                    value={p.worker || ''}
+                                                                    onChange={(val) => handleUpdateProject(p.id, { worker: val })}
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-
-                                                {/* Middle: Memo (Updated with MemoSection) */}
                                                 <MemoSection project={p} onUpdateData={handleUpdateData} />
-
-                                                {/* Bottom Row: Status Selector & Actions */}
                                                 <div className="flex flex-col sm:flex-row justify-between items-end gap-4 pt-3 border-t border-slate-200">
-                                                    
-                                                    {/* Status Selector - Bottom Left */}
                                                     <div className="w-full sm:w-auto">
                                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">ステータス変更</label>
                                                         <div className="relative">
@@ -970,11 +1801,9 @@
                                                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-700"><ChevronDownIcon className="w-4 h-4"/></div>
                                                         </div>
                                                     </div>
-                                                    
-                                                    {/* Actions (Close/Restore) - Bottom Right */}
                                                     <div className="flex gap-3">
                                                         {p.status === 'active' ? (
-                                                            <button onClick={() => handleArchiveProject(p.id)} className="text-xs font-bold text-slate-500 hover:text-brand-600 flex items-center px-3 py-2 rounded hover:bg-white transition"><ArchiveIcon className="w-4 h-4 mr-2"/> CLOSEする</button>
+                                                            <button onClick={() => handleArchiveProject(p.id)} className="text-xs font-bold text-slate-500 hover:text-brand-600 flex items-center px-3 py-2 rounded hover:bg-white transition"><ArchiveIcon className="w-4 h-4 mr-2"/> PJをCLOSEし完了(アーカイブ)へ移動</button>
                                                         ) : (
                                                             <button onClick={() => handleRestoreProject(p.id)} className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition">再開</button>
                                                         )}
@@ -992,9 +1821,7 @@
                     return (
                         <div className="space-y-3">
                             {filteredProjects.map(p => {
-                                const isExpanded = expandedProjectIds.has(p.id);
                                 const isActivePreview = activeWbsUrl && activeWbsUrl.includes(p.wbsUrl?.replace(/\/edit.*$/, '')); 
-
                                 return (
                                     <div key={p.id} className={`bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden transition-all ${isActivePreview ? 'ring-2 ring-brand-500' : 'hover:shadow-md'}`}>
                                         <div className="relative cursor-pointer" onClick={(e) => {
@@ -1012,7 +1839,6 @@
                                                 <div className="flex justify-between items-end text-[10px] text-slate-500 font-mono">
                                                     <div>
                                                         {p.pwbs && <span>{p.pwbs}{p.sakuban ? `-${p.sakuban}` : ''}</span>}
-                                                        {p.estimateNo && <div className="text-[9px] text-slate-400">{p.estimateNo}</div>}
                                                     </div>
                                                     <div className="font-bold text-slate-700">{formatProgress(p.wbsProgress)}</div>
                                                 </div>
@@ -1027,147 +1853,297 @@
             };
 
             return (
-                <div className="flex h-screen bg-slate-50 font-sans text-slate-600 overflow-hidden">
-                    {/* Main Layout */}
-                    {activeWbsUrl ? (
-                        <>
-                            {/* Left Sidebar (with Animation) */}
-                            <div className="w-[10%] bg-white border-r border-slate-200 flex flex-col min-w-[250px] animate-fade-in-left">
-                                <div className="p-4 border-b border-slate-200 bg-white z-10">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <div className="bg-brand-600 text-white p-1.5 rounded-lg"><BriefcaseIcon className="w-4 h-4" /></div>
-                                        <h1 className="text-sm font-bold text-slate-900 tracking-tight">ムラシスクリーン作業一覧2026</h1>
-                                    </div>
-                                    <button onClick={() => setIsProjectModalOpen(true)} className="w-full inline-flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-xs mb-3">
-                                        <PlusIcon className="w-3 h-3 mr-2"/> 新規プロジェクト
-                                    </button>
-                                    <div className="flex justify-between items-center gap-2">
-                                        <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg flex-1">
-                                            <button onClick={() => setTab('active')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>進行中</button>
-                                            <button onClick={() => setTab('archive')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>完了</button>
-                                        </div>
-                                        <button onClick={handleSyncWbs} disabled={syncing} title="進捗全同期" className={`p-1.5 rounded-lg transition border border-slate-200 ${syncing ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}>
-                                            <RefreshIcon className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-3 bg-slate-50">
-                                    {renderProjectList(true)}
-                                </div>
-                            </div>
+                <div className="flex h-screen bg-slate-50 font-sans text-slate-600 overflow-hidden relative">
+                    {/* Datalist for Member Options */}
+                    <datalist id="member-options">
+                        {MEMBER_OPTIONS.map(opt => <option key={opt} value={opt} />)}
+                    </datalist>
 
-                            {/* WBS Preview Area (with Animation) */}
-                            <div className="w-[90%] bg-slate-100 flex flex-col h-full relative animate-slide-in-right">
-                                <div className="flex-1 w-full h-full p-4">
-                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 w-full h-full overflow-hidden flex flex-col">
-                                        <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between items-center">
-                                            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
-                                                <FileTextIcon className="w-4 h-4 mr-2"/> WBS Preview (Edit Mode)
-                                            </h2>
-                                            <div className="flex items-center gap-4">
-                                                <a href={activeWbsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:text-brand-800 font-medium flex items-center">
-                                                    別タブで開く <ExternalLinkIcon className="w-3 h-3 ml-1"/>
-                                                </a>
-                                                <button 
-                                                    onClick={() => setActiveWbsUrl(null)} 
-                                                    className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded p-1 transition"
-                                                    title="閉じる"
-                                                >
-                                                    <XIcon className="w-5 h-5"/>
+                    <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+                    {/* Sliding Wrapper */}
+                    <div 
+                        className="flex h-full transition-transform duration-500 ease-in-out"
+                        style={{ width: '200vw', transform: showSchedule ? 'translateX(-100vw)' : 'translateX(0)' }}
+                    >
+                        {/* Left Side: Project List / Main Content */}
+                        <div className={`w-screen h-full flex flex-col min-w-0 flex-shrink-0`}>
+                            {activeWbsUrl ? (
+                                <div className="flex h-full">
+                                    <div className="w-[250px] bg-white border-r border-slate-200 flex flex-col min-w-[250px] animate-fade-in-left">
+                                        <div className="p-4 border-b border-slate-200 bg-white z-10">
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <div className="bg-brand-600 text-white p-1.5 rounded-lg"><BriefcaseIcon className="w-4 h-4" /></div>
+                                                <h1 className="text-sm font-bold text-slate-900 tracking-tight">作業一覧2026</h1>
+                                            </div>
+                                            <button onClick={() => setActiveModal('project')} className="w-full inline-flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-xs mb-3">
+                                                <PlusIcon className="w-3 h-3 mr-2"/> 新規プロジェクト
+                                            </button>
+                                            <div className="flex justify-between items-center gap-2">
+                                                <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg flex-1">
+                                                    <button onClick={() => setTab('active')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>進行中</button>
+                                                    <button onClick={() => setTab('archive')} className={`flex-1 py-1.5 rounded text-xs font-medium transition-all text-center ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>完了</button>
+                                                </div>
+                                                <button onClick={() => handleSyncWbs(false)} disabled={syncing} title="進捗全同期" className={`p-1.5 rounded-lg transition border border-slate-200 ${syncing ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                                    <RefreshIcon className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="flex-1 w-full h-full relative overflow-hidden bg-slate-50">
-                                            <iframe
-                                                src={activeWbsUrl}
-                                                className="border-none absolute top-0 left-0"
-                                                style={{ width: '111.11%', height: '111.11%', transform: 'scale(0.9)', transformOrigin: 'top left' }}
-                                                title="WBS Preview"
-                                                allow="autoplay"
-                                            ></iframe>
+                                        <div className="flex-1 overflow-y-auto p-3 bg-slate-50">
+                                            {renderProjectList(true)}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 bg-slate-100 flex flex-col h-full relative animate-slide-in-right overflow-hidden">
+                                        <div className="flex-1 w-full h-full p-4">
+                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 w-full h-full overflow-hidden flex flex-col">
+                                                <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between items-center">
+                                                    <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                                                        <FileTextIcon className="w-4 h-4 mr-2"/> WBS Preview (Edit Mode)
+                                                    </h2>
+                                                    <div className="flex items-center gap-4">
+                                                        {/* Active Users in Preview Mode Header */}
+                                                        <ActiveUserIndicator activeUsers={activeUsers} />
+                                                        
+                                                        <a href={activeWbsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:text-brand-800 font-medium flex items-center">
+                                                            別タブで開く <ExternalLinkIcon className="w-3 h-3 ml-1"/>
+                                                        </a>
+                                                        <button 
+                                                            onClick={() => setActiveWbsUrl(null)} 
+                                                            className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded p-1 transition"
+                                                            title="閉じる"
+                                                        >
+                                                            <XIcon className="w-5 h-5"/>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 w-full h-full relative overflow-hidden bg-slate-50">
+                                                    <iframe
+                                                        src={activeWbsUrl}
+                                                        className="border-none absolute top-0 left-0"
+                                                        style={{ width: '111.11%', height: '111.11%', transform: 'scale(0.9)', transformOrigin: 'top left' }}
+                                                        title="WBS Preview"
+                                                        allow="autoplay"
+                                                    ></iframe>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </>
-                    ) : (
-                        /* Full View */
-                        <div className="w-full flex flex-col h-full overflow-y-auto animate-fade-in-left">
-                            <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm px-4 sm:px-6 lg:px-8">
-                                <div className="flex justify-between h-16 items-center">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-brand-600 text-white p-2 rounded-lg"><BriefcaseIcon className="w-5 h-5" /></div>
-                                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">ムラシスクリーン作業一覧2026</h1>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg">
-                                            <button onClick={() => setTab('active')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>進行中</button>
-                                            <button onClick={() => setTab('archive')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>完了</button>
-                                        </div>
-                                        <button onClick={() => setIsProjectModalOpen(true)} className="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-sm">
-                                            <PlusIcon className="w-4 h-4 mr-2"/> 新規プロジェクト
-                                        </button>
-                                        <button 
-                                            onClick={handleSyncWbs} 
-                                            disabled={syncing}
-                                            className={`flex items-center text-sm font-medium px-3 py-2 rounded-lg transition ${syncing ? 'text-slate-400' : 'text-brand-600 hover:bg-brand-50'}`}
-                                            title="進捗全同期"
-                                        >
-                                            <RefreshIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                                            {syncing ? '同期中...' : '進捗全同期'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </nav>
+                            ) : (
+                                <div className="w-full flex flex-col h-full overflow-y-auto animate-fade-in-left">
+                                    <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm px-4 sm:px-6 lg:px-8">
+                                        <div className="flex justify-between h-16 items-center">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-brand-600 text-white p-2 rounded-lg"><BriefcaseIcon className="w-5 h-5" /></div>
+                                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">作業一覧2026</h1>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                
+                                                {/* Active Users Indicator */}
+                                                <ActiveUserIndicator activeUsers={activeUsers} />
 
-                            <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-                                {renderProjectList(false)}
-                            </main>
+                                                <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg">
+                                                    <button onClick={() => setTab('active')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>進行中</button>
+                                                    <button onClick={() => setTab('archive')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>完了</button>
+                                                </div>
+                                                <button onClick={() => setActiveModal('project')} className="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-sm">
+                                                    <PlusIcon className="w-4 h-4 mr-2"/> 新規プロジェクト
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleSyncWbs(false)} 
+                                                    disabled={syncing}
+                                                    className={`flex items-center text-sm font-medium px-3 py-2 rounded-lg transition ${syncing ? 'text-slate-400' : 'text-brand-600 hover:bg-brand-50'}`}
+                                                    title="進捗全同期"
+                                                >
+                                                    <RefreshIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                                                    {syncing ? '同期中...' : '進捗全同期'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </nav>
+                                    <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+                                        {renderProjectList(false)}
+                                    </main>
+                                </div>
+                            )}
                         </div>
-                    )}
 
-                    {/* New Project Modal */}
-                    {isProjectModalOpen && (
+                        {/* Right Side: Schedule Panel (Sliding) */}
+                        <div 
+                            className={`w-screen h-full flex-shrink-0 bg-white border-l border-slate-200 transition-all duration-300 ease-in-out relative flex flex-col`}
+                        >
+                            <SchedulePanel 
+                                projects={projects} 
+                                showSchedule={showSchedule}
+                                onOpenCreateModal={() => setActiveModal('trip')}
+                                onEditProject={openEditModal}
+                                onEditSchedule={handleEditSchedule}
+                                activeUsers={activeUsers}
+                            />
+                        </div>
+
+                        {/* Toggle Button - Positioned on the edge */}
+                        <div 
+                            className="absolute top-1/2 -translate-y-1/2 z-50 transition-all duration-300"
+                            style={{ 
+                                left: '100vw', 
+                                transform: showSchedule ? 'translateX(0)' : 'translateX(-100%)' 
+                            }}
+                        >
+                            <button
+                                onClick={() => setShowSchedule(!showSchedule)}
+                                className={`bg-white border border-slate-200 shadow-md p-2 text-slate-500 hover:text-brand-600 transition-colors flex items-center justify-center
+                                    ${showSchedule ? 'rounded-r-lg border-l-0' : 'rounded-l-lg border-r-0'}
+                                `}
+                                title={showSchedule ? "プロジェクト一覧に戻る" : "スケジュールを開く"}
+                            >
+                                {showSchedule ? <ChevronRightIcon className="w-5 h-5"/> : <ChevronLeftIcon className="w-5 h-5"/>}
+                            </button>
+                        </div>
+
+                    </div>
+
+                    {/* Active Modal */}
+                    {activeModal && (
                         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-                                <h2 className="text-xl font-bold mb-4">新規プロジェクト作成</h2>
-                                <div className="mb-4">
-                                    <label className="block text-xs font-bold text-brand-600 uppercase mb-2">Excelから貼り付け (スマートペースト)</label>
-                                    <textarea className="w-full h-20 px-3 py-2 border border-brand-200 bg-brand-50 rounded-lg text-xs font-mono focus:ring-2 focus:ring-brand-500 outline-none" placeholder={`行をコピーして貼り付け...\n例: 見積No | 内容 | 物件 | (無視) | PWBS | 作番 | PJ | 納期`} onChange={handleSmartPaste}></textarea>
-                                </div>
-                                <div className="border-t border-slate-100 my-4"></div>
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+                                <h2 className="text-xl font-bold mb-4">
+                                    {activeModal === 'project' ? '新規プロジェクト作成' : '新規出張予定登録'}
+                                </h2>
+                                
+                                {activeModal === 'project' && (
+                                    <>
+                                        <div className="mb-4">
+                                            <label className="block text-xs font-bold text-brand-600 uppercase mb-2">Excelから貼り付け (スマートペースト)</label>
+                                            <textarea className="w-full h-20 px-3 py-2 border border-brand-200 bg-brand-50 rounded-lg text-xs font-mono focus:ring-2 focus:ring-brand-500 outline-none" placeholder={`行をコピーして貼り付け...\n例: 見積No | 内容 | 物件 | (無視) | PWBS | 作番 | PJ | 納期`} onChange={handleSmartPaste}></textarea>
+                                        </div>
+                                        <div className="border-t border-slate-100 my-4"></div>
+                                    </>
+                                )}
+
                                 <form onSubmit={handleCreateProject}>
                                     <div className="space-y-4">
-                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">プロジェクト名</label><input name="name" value={projectForm.name} onChange={(e) => setProjectForm({...projectForm, name: e.target.value})} required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"/></div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">物件</label><input name="siteName" value={projectForm.siteName} onChange={(e) => setProjectForm({...projectForm, siteName: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJコード</label><input name="code" value={projectForm.code} onChange={(e) => setProjectForm({...projectForm, code: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">納期</label><input type="date" name="deadline" value={projectForm.deadline} onChange={(e) => setProjectForm({...projectForm, deadline: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">見積依頼No</label><input name="estimateNo" value={projectForm.estimateNo} onChange={(e) => setProjectForm({...projectForm, estimateNo: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" value={projectForm.pwbs} onChange={(e) => setProjectForm({...projectForm, pwbs: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">作番</label><input name="sakuban" value={projectForm.sakuban} onChange={(e) => setProjectForm({...projectForm, sakuban: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                        </div>
-                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">概要</label><textarea name="description" value={projectForm.description} onChange={(e) => setProjectForm({...projectForm, description: e.target.value})} rows="3" className="w-full px-3 py-2 border rounded-lg outline-none"></textarea></div>
                                         
-                                        {/* WBS作成不要チェックボックス */}
-                                        <div className="flex items-center pt-2">
-                                            <input 
-                                                type="checkbox" 
-                                                id="skipWbs" 
-                                                checked={projectForm.skipWbs} 
-                                                onChange={(e) => setProjectForm({...projectForm, skipWbs: e.target.checked})}
-                                                className="w-4 h-4 text-brand-600 bg-gray-100 border-gray-300 rounded focus:ring-brand-500"
-                                            />
-                                            <label htmlFor="skipWbs" className="ml-2 text-xs font-bold text-slate-500 uppercase">WBS作成不要（ファイルを作成しません）</label>
+                                        {/* Common Fields */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                                {activeModal === 'project' ? 'プロジェクト名' : 'プロジェクト名'}
+                                            </label>
+                                            <input name="name" value={projectForm.name} onChange={(e) => setProjectForm({...projectForm, name: e.target.value})} required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"/>
                                         </div>
+                                        
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">物件</label>
+                                            <input name="siteName" value={projectForm.siteName} onChange={(e) => setProjectForm({...projectForm, siteName: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/>
+                                        </div>
+
+                                        {/* Project Specific Fields */}
+                                        {activeModal === 'project' && (
+                                            <>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJコード</label><input name="code" value={projectForm.code} onChange={(e) => setProjectForm({...projectForm, code: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">納期</label><input type="date" name="deadline" value={projectForm.deadline} onChange={(e) => setProjectForm({...projectForm, deadline: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">見積依頼No</label><input name="estimateNo" value={projectForm.estimateNo} onChange={(e) => setProjectForm({...projectForm, estimateNo: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" value={projectForm.pwbs} onChange={(e) => setProjectForm({...projectForm, pwbs: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                </div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">作番</label><input name="sakuban" value={projectForm.sakuban} onChange={(e) => setProjectForm({...projectForm, sakuban: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                            </>
+                                        )}
+
+                                        {/* Trip Specific Fields */}
+                                        {activeModal === 'trip' && (
+                                            <>
+                                                {/* Moved Fields: Estimate, PWBS, Sakuban */}
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">見積依頼No</label><input name="estimateNo" value={projectForm.estimateNo} onChange={(e) => setProjectForm({...projectForm, estimateNo: e.target.value})} className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm outline-none"/></div>
+                                                    <div className="flex gap-2">
+                                                        <div className="w-28 flex-shrink-0"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">PWBS</label><input name="pwbs" value={projectForm.pwbs} onChange={(e) => setProjectForm({...projectForm, pwbs: e.target.value})} className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm outline-none"/></div>
+                                                        <div className="w-28 flex-shrink-0"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">作番</label><input name="sakuban" value={projectForm.sakuban} onChange={(e) => setProjectForm({...projectForm, sakuban: e.target.value})} className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm outline-none"/></div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-brand-50 p-4 rounded-xl border border-brand-100 shadow-sm mt-2">
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <div className="flex items-center">
+                                                            <UserIcon className="w-4 h-4 text-brand-500 mr-2"/>
+                                                            <label className="text-sm font-bold text-brand-700">参加メンバー & 日程</label>
+                                                        </div>
+                                                        <button type="button" onClick={() => addMemberToForm(setProjectForm, projectForm)} className="text-xs bg-white border border-brand-200 text-brand-600 px-3 py-1.5 rounded-full hover:bg-brand-50 hover:border-brand-300 font-bold transition flex items-center shadow-sm">
+                                                            <PlusIcon className="w-3 h-3 mr-1"/> メンバー追加
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="space-y-3 border-t border-brand-100 pt-3">
+                                                        {(projectForm.memberSchedules || []).map((m, idx) => (
+                                                            <div key={idx} className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-brand-100 shadow-sm animate-expand-fade-in group hover:border-brand-200 transition">
+                                                                <div className="flex gap-2 items-center">
+                                                                    <div className="flex-shrink-0 w-32">
+                                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">名前</label>
+                                                                        <input 
+                                                                            list="member-options"
+                                                                            placeholder="名前" 
+                                                                            value={m.name} 
+                                                                            onChange={(e) => updateMemberInForm(setProjectForm, projectForm, idx, 'name', e.target.value)} 
+                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand-500 outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex-1 flex gap-2">
+                                                                        <div className="flex-1">
+                                                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">開始</label>
+                                                                            <input 
+                                                                                type="date" 
+                                                                                value={m.startDate} 
+                                                                                onChange={(e) => updateMemberInForm(setProjectForm, projectForm, idx, 'startDate', e.target.value)} 
+                                                                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand-500 outline-none"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="flex-1">
+                                                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">終了</label>
+                                                                            <input 
+                                                                                type="date" 
+                                                                                value={m.endDate} 
+                                                                                onChange={(e) => updateMemberInForm(setProjectForm, projectForm, idx, 'endDate', e.target.value)} 
+                                                                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand-500 outline-none"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-end pb-1">
+                                                                        <button type="button" onClick={() => removeMemberFromForm(setProjectForm, projectForm, idx)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition mt-4">
+                                                                            <XIcon className="w-4 h-4"/>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {(!projectForm.memberSchedules || projectForm.memberSchedules.length === 0) && (
+                                                            <div className="text-xs text-slate-400 italic text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                                                メンバーを追加してください
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 mt-2 text-right">※ 全体の出張期間はメンバーの日程から自動計算されます</p>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {activeModal === 'project' && (
+                                            <div className="flex items-center pt-2">
+                                                <input 
+                                                    type="checkbox" 
+                                                    id="skipWbs" 
+                                                    checked={projectForm.skipWbs} 
+                                                    onChange={(e) => setProjectForm({...projectForm, skipWbs: e.target.checked})}
+                                                    className="w-4 h-4 text-brand-600 bg-gray-100 border-gray-300 rounded focus:ring-brand-500"
+                                                />
+                                                <label htmlFor="skipWbs" className="ml-2 text-xs font-bold text-slate-500 uppercase">WBS作成不要（ファイルを作成しません）</label>
+                                            </div>
+                                        )}
 
                                     </div>
                                     <div className="flex gap-3 mt-6">
-                                        <button type="button" onClick={() => setIsProjectModalOpen(false)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">キャンセル</button>
+                                        <button type="button" onClick={() => setActiveModal(null)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">キャンセル</button>
                                         <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50">
                                             {loading ? '作成中...' : '作成'}
                                         </button>
@@ -1177,31 +2153,133 @@
                         </div>
                     )}
                     
-                    {/* Settings Modal */}
-                    {editingProject && (
+                    {/* Settings Modal (Full Project Edit) - Left Click */}
+                    {editingProject && editForm && (
                         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-                                <h2 className="text-xl font-bold mb-4">プロジェクト詳細</h2>
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+                                <h2 className="text-xl font-bold mb-4">
+                                    {editingProject.type === 'trip' ? 'プロジェクト情報' : 'プロジェクト詳細編集'}
+                                </h2>
                                 <form onSubmit={handleSaveSettings}>
                                     <div className="space-y-4">
-                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">プロジェクト名</label><input name="name" defaultValue={editingProject.name} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">物件</label><input name="siteName" defaultValue={editingProject.siteName} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJコード</label><input name="code" defaultValue={editingProject.code} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                        
+                                        {/* Project Name - ALWAYS EDITABLE */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">プロジェクト名</label>
+                                            <input name="name" defaultValue={editForm.name} className="w-full px-3 py-2 border rounded-lg outline-none"/>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" defaultValue={editingProject.pwbs} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">作番</label><input name="sakuban" defaultValue={editingProject.sakuban} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">見積依頼No</label><input name="estimateNo" defaultValue={editingProject.estimateNo} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">納期</label><input type="date" name="deadline" defaultValue={editingProject.deadline} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
-                                        </div>
-                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">WBS URL</label><input name="wbsUrl" defaultValue={editingProject.wbsUrl} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="https://..."/></div>
+
+                                        {/* Standard Fields - HIDDEN for Trips */}
+                                        {editingProject.type !== 'trip' ? (
+                                            <>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">物件</label><input name="siteName" defaultValue={editForm.siteName} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PJコード</label><input name="code" defaultValue={editForm.code} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">PWBS</label><input name="pwbs" defaultValue={editForm.pwbs} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">作番</label><input name="sakuban" defaultValue={editForm.sakuban} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">見積依頼No</label><input name="estimateNo" defaultValue={editForm.estimateNo} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">納期</label><input type="date" name="deadline" defaultValue={editForm.deadline} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            // Trip specific simple fields
+                                            <div>
+                                                <div className="mb-4">
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">物件</label>
+                                                    <input name="siteName" defaultValue={editForm.siteName} className="w-full px-3 py-2 border rounded-lg outline-none"/>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">見積依頼No</label><input name="estimateNo" defaultValue={editForm.estimateNo} className="w-full px-3 py-2 border rounded-lg outline-none"/></div>
+                                                    <div className="flex gap-2">
+                                                        <div className="w-24"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">PWBS</label><input name="pwbs" defaultValue={editForm.pwbs} className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm outline-none"/></div>
+                                                        <div className="w-24"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">作番</label><input name="sakuban" defaultValue={editForm.sakuban} className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm outline-none"/></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Business Trip Dates & Members (Edit) */}
+                                        {(editingProject.type === 'trip' || editForm.startDate) && (
+                                            <div className="bg-brand-50 p-3 rounded-lg border border-brand-100">
+                                                {editingProject.type !== 'trip' && (
+                                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">開始日</label><input type="date" name="startDate" defaultValue={editForm.startDate} className="w-full px-3 py-2 border rounded-lg outline-none bg-white"/></div>
+                                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">終了日</label><input type="date" name="endDate" defaultValue={editForm.endDate} className="w-full px-3 py-2 border rounded-lg outline-none bg-white"/></div>
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="border-t border-brand-100 pt-3">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <label className="text-xs font-bold text-brand-600 uppercase">参加メンバー & 日程</label>
+                                                        <button type="button" onClick={() => addMemberToForm(setEditForm, editForm)} className="text-[10px] bg-white border border-brand-200 text-brand-600 px-2 py-1 rounded hover:bg-brand-100">＋ 追加</button>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        {(editForm.memberSchedules || []).map((m, idx) => (
+                                                            <div key={idx} className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-brand-100 shadow-sm animate-expand-fade-in group hover:border-brand-200 transition">
+                                                                <div className="flex gap-2 items-center">
+                                                                    <div className="flex-shrink-0 w-32">
+                                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">名前</label>
+                                                                        <input 
+                                                                            list="member-options"
+                                                                            placeholder="名前" 
+                                                                            value={m.name} 
+                                                                            onChange={(e) => updateMemberInForm(setEditForm, editForm, idx, 'name', e.target.value)} 
+                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand-500 outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex-1 flex gap-2">
+                                                                        <div className="flex-1">
+                                                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">開始</label>
+                                                                            <input 
+                                                                                type="date" 
+                                                                                value={m.startDate} 
+                                                                                onChange={(e) => updateMemberInForm(setEditForm, editForm, idx, 'startDate', e.target.value)} 
+                                                                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand-500 outline-none"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="flex-1">
+                                                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">終了</label>
+                                                                            <input 
+                                                                                type="date" 
+                                                                                value={m.endDate} 
+                                                                                onChange={(e) => updateMemberInForm(setEditForm, editForm, idx, 'endDate', e.target.value)} 
+                                                                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand-500 outline-none"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-end pb-1">
+                                                                        <button type="button" onClick={() => removeMemberFromForm(setEditForm, editForm, idx)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition mt-4">
+                                                                            <XIcon className="w-4 h-4"/>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* WBS URL - HIDDEN for Trips */}
+                                        {editingProject.type !== 'trip' && (
+                                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">WBS URL</label><input name="wbsUrl" defaultValue={editForm.wbsUrl} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="https://..."/></div>
+                                        )}
                                     </div>
                                     <div className="flex gap-3 mt-6">
-                                        <button type="button" onClick={() => setEditingProject(null)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">キャンセル</button>
-                                        <button type="submit" className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">保存</button>
+                                        <button type="button" onClick={() => { setEditingProject(null); setEditForm(null); }} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">キャンセル</button>
+                                        
+                                        {editingProject.type === 'trip' ? (
+                                            <>
+                                                <button type="button" onClick={() => handleDeleteProject(editingProject.id)} className="flex-1 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 font-bold">削除</button>
+                                                <button type="submit" className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-bold shadow-sm">保存</button>
+                                            </>
+                                        ) : (
+                                            <button type="submit" className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-bold shadow-sm">保存</button>
+                                        )}
                                     </div>
                                 </form>
                             </div>

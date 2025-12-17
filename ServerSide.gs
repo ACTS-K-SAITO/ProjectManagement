@@ -1,10 +1,12 @@
 /**
  * Google Apps Script for Milestone Manager
  * Features: WBS Search & Info Extraction (Updated Column Mapping)
+ * Added: Active User Tracking (Heartbeat)
  */
 
 const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 const SHEET_PROJECTS = 'Projects';
+const SHEET_ACTIVE_USERS = 'ActiveUsers'; // ★閲覧中ユーザー管理用シート
 
 const TEMPLATE_WBS_ID = '1T7QAlk5rxKE_6-oOZvf8XAkmxuqCpMPu6LPo7vFy4Dc'; 
 const DEST_FOLDER_ID = '1GeIiZezt8EF6rwEIVBDVgoSEE_rIlfjw'; 
@@ -18,11 +20,13 @@ const WBS_COST_SHEET_NAME = '工数管理';
 const WBS_MANDAYS_CELL = 'E2';        
 const WBS_MANMONTHS_CELL = 'F2';      
 
+const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000; // ★5分以内のアクセスを「閲覧中」とみなす
+
 // ★タスク検索設定
 const TARGET_TASKS = [
   { key: 'revInternal', name: '定義レビュー(社内)', shortName: '社内レビュー' },
   { key: 'revMurasys',  name: '定義レビュー(ムラシス)', shortName: 'ムラシスレビュー' },
-  { key: 'testInteg',   name: '統合試験', shortName: '統合試験' },
+  { key: 'testInteg',   name: 'リンクテスト(統合試験)', shortName: '統合試験' },
   { key: 'testActs',    name: 'ACTS社内検証', shortName: 'ACTS検証' },
   { key: 'testSystem',  name: 'システム検証', shortName: 'システム検証' },
   { key: 'test3rd',     name: '第三者検証', shortName: '第三者検証' }
@@ -53,6 +57,92 @@ function apiGetData() {
   return {
     projects: getRowsAsObjects(pSheet)
   };
+}
+
+// ★ Heartbeat Function (閲覧中ユーザーの更新と取得)
+function apiHeartbeat() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet(ss, SHEET_ACTIVE_USERS);
+  const lock = LockService.getScriptLock();
+  
+  // Get current user info
+  const email = Session.getActiveUser().getEmail() || "Unknown";
+  const shortName = email.split('@')[0];
+  const now = new Date();
+  
+  let activeUsers = [];
+
+  try {
+    // データ整合性のためロック (3秒待機)
+    if (lock.tryLock(3000)) {
+      const data = sheet.getDataRange().getValues();
+      let newData = [];
+      let found = false;
+      
+      // ヘッダー行の確認と初期化
+      if (data.length === 0 || data[0][0] !== 'email') {
+        newData.push(['email', 'name', 'lastSeen']);
+      } else {
+        newData.push(data[0]);
+      }
+      
+      // 既存データのフィルタリング（期限切れ削除）と自身の更新
+      // Skip header (i=1)
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        const rowTimeStr = row[2];
+        if (!rowTimeStr) continue;
+        
+        const rowTime = new Date(rowTimeStr);
+        // タイムアウトしていないユーザーのみ残す
+        if (now.getTime() - rowTime.getTime() <= ACTIVE_THRESHOLD_MS) {
+          if (row[0] === email) {
+            // 自分が見つかったら時刻更新
+            newData.push([email, shortName, now.toISOString()]);
+            found = true;
+          } else {
+            newData.push(row);
+          }
+        }
+      }
+      
+      // 自分が見つからなかった（新規接続）場合に追加
+      if (!found) {
+        newData.push([email, shortName, now.toISOString()]);
+      }
+      
+      // シートをクリアして書き直し（行削除の代わり）
+      sheet.clearContents();
+      if (newData.length > 0) {
+        sheet.getRange(1, 1, newData.length, 3).setValues(newData);
+      }
+      
+      // レスポンス用に名前リストを作成（ヘッダー除く）
+      activeUsers = newData.slice(1).map(row => row[1]);
+      
+      lock.releaseLock();
+    } else {
+      // ロック取得失敗時は読み取り専用で返す（自分の更新は諦める）
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+         if (data[i][2]) {
+             const t = new Date(data[i][2]);
+             if (now.getTime() - t.getTime() <= ACTIVE_THRESHOLD_MS) {
+                 activeUsers.push(data[i][1]);
+             }
+         }
+      }
+      // 自分を含めておく（楽観的追加）
+      if (!activeUsers.includes(shortName)) activeUsers.push(shortName);
+    }
+    
+  } catch (e) {
+    console.warn("Heartbeat error: " + e.message);
+    activeUsers.push(shortName); // エラーでも自分は返す
+  }
+  
+  // 重複排除とソート
+  return { activeUsers: [...new Set(activeUsers)].sort() };
 }
 
 // ★ Memo Post Function
@@ -231,6 +321,44 @@ function apiDeleteMemo(projectId, entryContent) {
     }
   } catch (e) {
     console.error("Memo delete failed: " + e.message);
+    throw e;
+  } finally {
+    lock.releaseLock();
+  }
+  
+  return apiGetData();
+}
+
+// ★ Project Delete Function
+function apiDeleteProject(projectId) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet(ss, SHEET_PROJECTS);
+  const lock = LockService.getScriptLock();
+  
+  try {
+    lock.waitLock(5000);
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return apiGetData();
+    
+    const headers = data[0];
+    const idIdx = headers.indexOf('id');
+    
+    if (idIdx === -1) return apiGetData();
+    
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][idIdx] === projectId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+    
+    if (rowIndex > 0) {
+      sheet.deleteRow(rowIndex);
+    }
+  } catch (e) {
+    console.error("Project delete failed: " + e.message);
     throw e;
   } finally {
     lock.releaseLock();

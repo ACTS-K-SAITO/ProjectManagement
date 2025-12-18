@@ -818,7 +818,13 @@
                                                     <button className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl border transition-all ${p.wbsUrl ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 cursor-pointer shadow-md' : 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'}`} onClick={(e) => { e.stopPropagation(); if (p.wbsUrl) handleSelectProject(p); }}>
                                                         <FileTextIcon className="w-8 h-8 mb-1" /><span className="text-sm font-bold">WBS</span>
                                                     </button>
-                                                    <button className="text-slate-400 p-2 hover:bg-slate-100 rounded-full">{isExpanded ? <ChevronUpIcon className="w-6 h-6"/> : <ChevronDownIcon className="w-6 h-6"/>}</button>
+                                                    {/* ★修正: Vボタン押下でも展開/閉じるを実行するようにonClickを追加 */}
+                                                    <button 
+                                                        className="text-slate-400 p-2 hover:bg-slate-100 rounded-full"
+                                                        onClick={(e) => { e.stopPropagation(); toggleExpand(p.id); }}
+                                                    >
+                                                        {isExpanded ? <ChevronUpIcon className="w-6 h-6"/> : <ChevronDownIcon className="w-6 h-6"/>}
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -873,7 +879,7 @@
                                                     <div className="flex-shrink-0 pt-6 flex flex-col gap-3 w-32">
                                                         <button onClick={() => openEditModal(p)} className="w-full flex items-center justify-center text-xs font-bold text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded shadow-sm hover:bg-slate-50 transition"><SettingsIcon className="w-4 h-4 mr-1.5" /> PJ詳細</button>
                                                         <div className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-sm space-y-2">
-                                                            <MultiSelect label="PL (リーダー)" options={MEMBER_OPTIONS} value={p.pl || ''} onChange={(val) => handleUpdateProject(p.id, { pl: val })} />
+                                                            <MultiSelect label="PL" options={MEMBER_OPTIONS} value={p.pl || ''} onChange={(val) => handleUpdateProject(p.id, { pl: val })} />
                                                             <MultiSelect label="作業者" options={MEMBER_OPTIONS} value={p.worker || ''} onChange={(val) => handleUpdateProject(p.id, { worker: val })} />
                                                         </div>
                                                     </div>
@@ -957,7 +963,7 @@
                                                     <button onClick={() => setTab('archive')} className={`px-4 py-1.5 rounded-md text-sm font-medium ${tab === 'archive' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>完了</button>
                                                 </div>
                                                 <button onClick={() => setActiveModal('project')} className="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium text-sm"><PlusIcon className="w-4 h-4 mr-2"/> 新規プロジェクト</button>
-                                                <button onClick={() => handleSyncWbs(false)} disabled={syncing} className={`flex items-center text-sm font-medium px-3 py-2 rounded-lg transition ${syncing ? 'text-slate-400' : 'text-brand-600 hover:bg-brand-50'}`}><RefreshIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />{syncing ? '同期中...' : '進捗全同期'}</button>
+                                                <button onClick={() => handleSyncWbs(false)} disabled={syncing} className={`flex items-center text-sm font-medium px-3 py-2 rounded-lg transition ${syncing ? 'text-slate-400' : 'text-brand-600 hover:bg-brand-50'}`}><RefreshIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />{syncing ? '' : ''}</button>
                                             </div>
                                         </div>
                                     </nav>
@@ -1122,8 +1128,5 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
-</body>
-</html>
-</script>
 </body>
 </html>

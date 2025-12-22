@@ -641,34 +641,38 @@
                 } else setActiveWbsUrl(null);
             };
 
-            // ★スマートペースト機能の復元
+            // ★スマートペースト機能の修正
             const handleSmartPaste = (e) => {
                 const text = e.target.value;
                 if (!text) return;
                 const lines = text.trim().split(/\r?\n/);
                 if (lines.length === 0) return;
+                
+                // タブ区切りで分割
                 const cols = lines[0].split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+                
+                // 固定列マッピング (0:見積No, 1:内容, 2:物件, 3:担当(無視), 4:CSPA(無視), 5:PWBS, 6:作番, 7:PJ, 8:納期)
+                // 最低限の列数チェック
                 if (cols.length < 2) return;
-                let estimateNo = cols[0] || '';
-                let name = cols[1] || '';
-                let siteName = cols[2] || '';
-                const col3 = cols[3] || '';
-                if (col3 && !col3.includes('担当') && !col3.includes('CSPA') && col3.length < 15) {
-                    siteName = siteName ? `${siteName} ${col3}` : col3;
+
+                const estimateNo = cols[0] || '';
+                const name = cols[1] || '';
+                const siteName = cols[2] || '';
+                // cols[3] 担当 -> 無視
+                // cols[4] CSPA -> 無視
+                const pwbs = cols[5] || '';
+                const sakuban = cols[6] || '';
+                const code = cols[7] || '';
+                
+                let deadline = '';
+                if (cols[8]) {
+                     const m = cols[8].match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                     if (m) {
+                         deadline = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                     }
                 }
-                let pwbs = ''; let sakuban = ''; let code = ''; let deadline = '';
-                for (let i = 4; i < cols.length; i++) {
-                    const val = cols[i]; if (!val) continue;
-                    if (!deadline && val.match(/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/)) {
-                        const m = val.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-                        if (m) deadline = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-                        continue;
-                    }
-                    if (!pwbs && val.match(/^[A-Z]\d{3}$/)) { pwbs = val; continue; }
-                    if (!sakuban && val.match(/^\d{5}$/)) { sakuban = val; continue; }
-                    if (!code && i === 6 && !val.match(/\d{4}[\/\-]/)) { code = val; continue; }
-                }
-                setProjectForm(prev => ({ ...prev, name, siteName, estimateNo, pwbs, sakuban, code, deadline }));
+                
+                setProjectForm(prev => ({ ...prev, estimateNo, name, siteName, pwbs, sakuban, code, deadline }));
             };
 
             // ★見積書検索
@@ -1008,12 +1012,12 @@
                             <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
                                 <h2 className="text-xl font-bold mb-4">{activeModal === 'project' ? '新規プロジェクト作成' : '新規出張予定登録'}</h2>
                                 
-                                {/* ★スマートペースト機能の復元 */}
+                                {/* ★スマートペースト機能の修正 */}
                                 {activeModal === 'project' && (
                                     <>
                                         <div className="mb-4">
                                             <label className="block text-xs font-bold text-brand-600 uppercase mb-2">Excelから貼り付け (スマートペースト)</label>
-                                            <textarea className="w-full h-20 px-3 py-2 border border-brand-200 bg-brand-50 rounded-lg text-xs font-mono focus:ring-2 focus:ring-brand-500 outline-none" placeholder={`行をコピーして貼り付け...\n例: 見積No | 内容 | 物件 | (無視) | PWBS | 作番 | PJ | 納期`} onChange={handleSmartPaste}></textarea>
+                                            <textarea className="w-full h-20 px-3 py-2 border border-brand-200 bg-brand-50 rounded-lg text-xs font-mono focus:ring-2 focus:ring-brand-500 outline-none" placeholder={`行をコピーして貼り付け...\n例: 見積No | 内容 | 物件 | 担当(無視) | CSPA(無視) | PWBS | 作番 | PJ | 納期`} onChange={handleSmartPaste}></textarea>
                                         </div>
                                         <div className="border-t border-slate-100 my-4"></div>
                                     </>

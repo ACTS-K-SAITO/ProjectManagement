@@ -87,7 +87,8 @@
             },
             heartbeat: (onSuccess, onFailure) => {
                 if (isPreview) {
-                    const users = ["自分", "金丸", "三輪"].filter(() => Math.random() > 0.3);
+                    // ★モックデータを日本語名に変更
+                    const users = ["齋藤", "金丸", "三輪", "大﨑", "高田", "自分"].filter(() => Math.random() > 0.4);
                     if(!users.includes("自分")) users.push("自分");
                     setTimeout(() => onSuccess({ activeUsers: users }), 500);
                 } else { google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiHeartbeat(); }
@@ -275,15 +276,46 @@
             );
         }
 
+        // ★ユーザーカラーの定義と取得関数
+        const USER_COLORS = [
+            { bg: 'bg-red-100', text: 'text-red-700' },
+            { bg: 'bg-orange-100', text: 'text-orange-700' },
+            { bg: 'bg-amber-100', text: 'text-amber-700' },
+            { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+            { bg: 'bg-teal-100', text: 'text-teal-700' },
+            { bg: 'bg-cyan-100', text: 'text-cyan-700' },
+            { bg: 'bg-blue-100', text: 'text-blue-700' },
+            { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+            { bg: 'bg-violet-100', text: 'text-violet-700' },
+            { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700' },
+            { bg: 'bg-pink-100', text: 'text-pink-700' },
+            { bg: 'bg-rose-100', text: 'text-rose-700' },
+        ];
+
+        // 名前からハッシュを生成して色を決定（リロードごとに同じ名前なら同じ色になる安定版）
+        // 「毎回ランダム」にするならハッシュ計算にMath.random()を含めるが、
+        // ハートビート更新のたびにチカチカしないよう、名前ベースのハッシュ推奨
+        const getColorForUser = (name) => {
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const index = Math.abs(hash) % USER_COLORS.length;
+            return USER_COLORS[index];
+        };
+
         function ActiveUserIndicator({ activeUsers }) {
             return (
                 <div className="flex items-center">
                     <div className="flex -space-x-1.5 overflow-hidden">
-                        {activeUsers.map((u, i) => (
-                            <div key={i} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-600 shadow-sm" title={`${u}が閲覧中`}>
-                                {u.slice(0, 1)}
-                            </div>
-                        ))}
+                        {activeUsers.map((u, i) => {
+                            const color = getColorForUser(u);
+                            return (
+                                <div key={i} className={`inline-block h-6 w-6 rounded-full ring-2 ring-white ${color.bg} flex items-center justify-center text-[10px] font-bold ${color.text} shadow-sm`} title={`${u}が閲覧中`}>
+                                    {u.slice(0, 1)}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             );
